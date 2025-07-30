@@ -1,0 +1,1 @@
+Use the gitorg tool to find and fix issue #. Follow these steps: 1. Understand the issue described in the ticket 2. Locate the relevant code in our codebase 3. Implement a solution that addresses the root cause 4. Add appropriate tests 5. Prepare a concise PR description 6. Create the PR
