@@ -101,6 +101,12 @@ async def _run_design_process(
             "\n[red]Network connection error. Please check your internet connection and try again.[/red]"
         )
         raise click.Abort() from None
+    except OSError as e:
+        console.print(f"\n[red]File system error: {e}[/red]")
+        raise click.Abort() from e
+    except ValueError as e:
+        console.print(f"\n[red]Configuration error: {e}[/red]")
+        raise click.Abort() from e
     except Exception as e:
         console.print(f"\n[red]Unexpected error: {e}[/red]")
         raise click.Abort() from e

@@ -70,9 +70,7 @@ class InteractiveQuestionnaire:
                     return None
                 # Sanitize string values
                 for _key, value in item.items():
-                    if (
-                        isinstance(value, str) and len(value) > MAX_ITEM_LENGTH
-                    ):
+                    if isinstance(value, str) and len(value) > MAX_ITEM_LENGTH:
                         return None
 
             return parsed_data
@@ -173,6 +171,11 @@ class InteractiveQuestionnaire:
                 "[yellow]Network connection error. Using default questions.[/yellow]"
             )
             return self._get_default_questions()
+        except (ValueError, TypeError) as e:
+            self.console.print(
+                f"[yellow]Invalid response format: {e}. Using default questions.[/yellow]"
+            )
+            return self._get_default_questions()
         except Exception as e:
             self.console.print(
                 f"[yellow]Error generating questions: {e}. Using default questions.[/yellow]"
@@ -253,8 +256,12 @@ class InteractiveQuestionnaire:
                     )
             except KeyboardInterrupt:
                 raise
-            except Exception:
+            except (ValueError, TypeError):
                 self.console.print("[red]Invalid choice. Please enter a number.[/red]")
+            except Exception:
+                self.console.print(
+                    "[red]Unexpected input error. Please try again.[/red]"
+                )
 
     def _handle_text_input(self, question: Question) -> str:
         """Handle text input questions."""
@@ -310,6 +317,11 @@ class InteractiveQuestionnaire:
                 "[dim]Unable to generate follow-up questions due to connection error[/dim]"
             )
             return []
+        except (ValueError, TypeError):
+            self.console.print(
+                "[dim]Invalid response format for follow-up questions[/dim]"
+            )
+            return []
         except Exception:
             return []
 
@@ -352,7 +364,9 @@ class InteractiveQuestionnaire:
         if isinstance(value, str):
             # Remove control characters and limit length
             sanitized = "".join(
-                char for char in value if ord(char) >= 32 or char in ALLOWED_CONTROL_CHARS
+                char
+                for char in value
+                if ord(char) >= 32 or char in ALLOWED_CONTROL_CHARS
             )
             return sanitized[:MAX_FIELD_LENGTH]
         if isinstance(value, int | float | bool):
@@ -376,7 +390,11 @@ class InteractiveQuestionnaire:
                 for item in row:
                     cleaned = item.strip()
                     # Remove surrounding quotes if they exist (for fallback cases)
-                    if cleaned.startswith('"') and cleaned.endswith('"') and len(cleaned) > 1:
+                    if (
+                        cleaned.startswith('"')
+                        and cleaned.endswith('"')
+                        and len(cleaned) > 1
+                    ):
                         cleaned = cleaned[1:-1]
                     if cleaned and len(cleaned) <= MAX_ITEM_LENGTH:
                         items.append(cleaned)
@@ -385,7 +403,11 @@ class InteractiveQuestionnaire:
             for item in value.split(","):
                 cleaned = item.strip()
                 # Remove surrounding quotes if they exist
-                if cleaned.startswith('"') and cleaned.endswith('"') and len(cleaned) > 1:
+                if (
+                    cleaned.startswith('"')
+                    and cleaned.endswith('"')
+                    and len(cleaned) > 1
+                ):
                     cleaned = cleaned[1:-1]
                 if cleaned and len(cleaned) <= MAX_ITEM_LENGTH:
                     items.append(cleaned)
@@ -439,7 +461,9 @@ class InteractiveQuestionnaire:
         app_type = app_type_raw.lower() if app_type_raw else DEFAULT_APP_TYPE.lower()
 
         name = self._sanitize_string_value(
-            self.collected_data.get("app_name", self._generate_intelligent_app_name(app_type))
+            self.collected_data.get(
+                "app_name", self._generate_intelligent_app_name(app_type)
+            )
         )
         if not name.strip():
             name = self._generate_intelligent_app_name(app_type)
@@ -492,6 +516,23 @@ class InteractiveQuestionnaire:
                 goals=goals,
                 constraints=constraints,
                 additional_info=self.collected_data,
+            )
+        except (ValueError, TypeError) as e:
+            self.console.print(f"[red]Invalid data for AppDesign: {e}[/red]")
+            self.console.print(
+                "[yellow]Using minimal default configuration...[/yellow]"
+            )
+            # Return minimal valid AppDesign as fallback
+            return AppDesign(
+                name=INTELLIGENT_APP_NAMES["web"]["default"],
+                type=DEFAULT_APP_TYPE.lower(),
+                description=DEFAULT_APP_DESCRIPTION,
+                primary_features=[],
+                tech_stack=[],
+                target_audience=None,
+                goals=[],
+                constraints=[],
+                additional_info={},
             )
         except Exception as e:
             self.console.print(f"[red]Error creating AppDesign: {e}[/red]")

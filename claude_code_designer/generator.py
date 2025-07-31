@@ -171,6 +171,12 @@ Keep it concise but comprehensive. Focus on essential requirements without over-
             raise
         except ConnectionError:
             content = f"# PRD for {design.name}\n\n## Executive Summary\n\n{design.description}\n\n*Note: Full PRD generation failed due to connection error. Please regenerate when connection is restored.*"
+        except (PermissionError, OSError) as e:
+            troubleshooting = ERROR_MESSAGES["default"]
+            content = f"# PRD for {design.name}\n\n## Executive Summary\n\n{design.description}\n\n*Note: PRD generation failed due to a system error. {troubleshooting} Error details: {str(e)}*"
+        except (ValueError, TypeError) as e:
+            troubleshooting = ERROR_MESSAGES["default"]
+            content = f"# PRD for {design.name}\n\n## Executive Summary\n\n{design.description}\n\n*Note: PRD generation failed due to invalid data. {troubleshooting} Error details: {str(e)}*"
         except Exception as e:
             error_msg = str(e).lower()
             if "authentication" in error_msg or "unauthorized" in error_msg:
@@ -225,6 +231,12 @@ Focus on:
             raise
         except ConnectionError:
             content = f"# CLAUDE.md - {design.name}\n\n## Project Overview\n\n{design.description}\n\n*Note: Full CLAUDE.md generation failed due to connection error. Please regenerate when connection is restored.*"
+        except (PermissionError, OSError) as e:
+            troubleshooting = ERROR_MESSAGES["default"]
+            content = f"# CLAUDE.md - {design.name}\n\n## Project Overview\n\n{design.description}\n\n*Note: CLAUDE.md generation failed due to a system error. {troubleshooting} Error details: {str(e)}*"
+        except (ValueError, TypeError) as e:
+            troubleshooting = ERROR_MESSAGES["default"]
+            content = f"# CLAUDE.md - {design.name}\n\n## Project Overview\n\n{design.description}\n\n*Note: CLAUDE.md generation failed due to invalid data. {troubleshooting} Error details: {str(e)}*"
         except Exception as e:
             error_msg = str(e).lower()
             if "authentication" in error_msg or "unauthorized" in error_msg:
@@ -281,6 +293,22 @@ Keep it simple and focused on user needs. Avoid unnecessary technical complexity
                 else "- Core functionality"
             )
             content = f"# {design.name}\n\n{design.description}\n\n## Features\n\n{features}\n\n*Note: Full README generation failed due to connection error. Please regenerate when connection is restored.*"
+        except (PermissionError, OSError) as e:
+            troubleshooting = ERROR_MESSAGES["default"]
+            features = (
+                "\n".join([f"- {f}" for f in design.primary_features])
+                if design.primary_features
+                else "- Core functionality"
+            )
+            content = f"# {design.name}\n\n{design.description}\n\n## Features\n\n{features}\n\n*Note: README generation failed due to a system error. {troubleshooting} Error details: {str(e)}*"
+        except (ValueError, TypeError) as e:
+            troubleshooting = ERROR_MESSAGES["default"]
+            features = (
+                "\n".join([f"- {f}" for f in design.primary_features])
+                if design.primary_features
+                else "- Core functionality"
+            )
+            content = f"# {design.name}\n\n{design.description}\n\n## Features\n\n{features}\n\n*Note: README generation failed due to invalid data. {troubleshooting} Error details: {str(e)}*"
         except Exception as e:
             error_msg = str(e).lower()
             if "authentication" in error_msg or "unauthorized" in error_msg:
