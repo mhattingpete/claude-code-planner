@@ -91,9 +91,14 @@ Keep it concise but comprehensive. Focus on essential requirements without over-
 
         content = ""
         try:
-            async for message in query(prompt=prompt):
-                if hasattr(message, "content"):
-                    content += message.content
+            query_stream = query(prompt=prompt)
+            try:
+                async for message in query_stream:
+                    if hasattr(message, "content"):
+                        content += message.content
+            finally:
+                if hasattr(query_stream, "aclose"):
+                    await query_stream.aclose()
         except KeyboardInterrupt:
             raise
         except ConnectionError:
@@ -130,9 +135,14 @@ Focus on:
 
         content = ""
         try:
-            async for message in query(prompt=prompt):
-                if hasattr(message, "content"):
-                    content += message.content
+            query_stream = query(prompt=prompt)
+            try:
+                async for message in query_stream:
+                    if hasattr(message, "content"):
+                        content += message.content
+            finally:
+                if hasattr(query_stream, "aclose"):
+                    await query_stream.aclose()
         except KeyboardInterrupt:
             raise
         except ConnectionError:
@@ -166,9 +176,14 @@ Keep it simple and focused on user needs. Avoid unnecessary technical complexity
 
         content = ""
         try:
-            async for message in query(prompt=prompt):
-                if hasattr(message, "content"):
-                    content += message.content
+            query_stream = query(prompt=prompt)
+            try:
+                async for message in query_stream:
+                    if hasattr(message, "content"):
+                        content += message.content
+            finally:
+                if hasattr(query_stream, "aclose"):
+                    await query_stream.aclose()
         except KeyboardInterrupt:
             raise
         except ConnectionError:

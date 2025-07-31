@@ -82,11 +82,16 @@ class InteractiveQuestionnaire:
 
         try:
             questions_json = ""
-            async for message in query(prompt=prompt):
-                if hasattr(message, "content"):
-                    questions_json += message.content
-                else:
-                    questions_json += str(message)
+            query_stream = query(prompt=prompt)
+            try:
+                async for message in query_stream:
+                    if hasattr(message, "content"):
+                        questions_json += message.content
+                    else:
+                        questions_json += str(message)
+            finally:
+                if hasattr(query_stream, "aclose"):
+                    await query_stream.aclose()
 
             # Parse JSON and create Question objects
             questions_data = json.loads(questions_json.strip())
@@ -218,11 +223,16 @@ class InteractiveQuestionnaire:
 
         try:
             questions_json = ""
-            async for message in query(prompt=prompt):
-                if hasattr(message, "content"):
-                    questions_json += message.content
-                else:
-                    questions_json += str(message)
+            query_stream = query(prompt=prompt)
+            try:
+                async for message in query_stream:
+                    if hasattr(message, "content"):
+                        questions_json += message.content
+                    else:
+                        questions_json += str(message)
+            finally:
+                if hasattr(query_stream, "aclose"):
+                    await query_stream.aclose()
 
             questions_data = json.loads(questions_json.strip())
             return [Question(**q) for q in questions_data]
