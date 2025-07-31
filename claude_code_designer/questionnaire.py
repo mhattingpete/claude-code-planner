@@ -1,5 +1,6 @@
 """Interactive question system for gathering application requirements."""
 
+import json
 from typing import Any
 
 from claude_code_sdk import query
@@ -88,8 +89,6 @@ class InteractiveQuestionnaire:
                     questions_json += str(message)
 
             # Parse JSON and create Question objects
-            import json
-
             questions_data = json.loads(questions_json.strip())
             return [Question(**q) for q in questions_data]
 
@@ -224,8 +223,6 @@ class InteractiveQuestionnaire:
                     questions_json += message.content
                 else:
                     questions_json += str(message)
-
-            import json
 
             questions_data = json.loads(questions_json.strip())
             return [Question(**q) for q in questions_data]

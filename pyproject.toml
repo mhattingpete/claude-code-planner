@@ -15,6 +15,8 @@ dependencies = [
 dev = [
     "ruff>=0.4.0",
     "pytest>=8.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-asyncio>=0.23.0",
 ]
 
 [project.scripts]
@@ -31,3 +33,8 @@ target-version = "py311"
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "A", "C4", "T20"]
 ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "--cov=claude_code_designer --cov-report=term-missing --cov-report=html"

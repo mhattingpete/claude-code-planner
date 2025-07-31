@@ -9,7 +9,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from .generator import DocumentGenerator
-from .models import DocumentRequest
+from .models import AppDesign, DocumentRequest
 from .questionnaire import InteractiveQuestionnaire
 
 console = Console()
@@ -17,7 +17,7 @@ console = Console()
 
 @click.group()
 @click.version_option()
-def main():
+def main() -> None:
     """Claude Code Designer - Generate project documentation using Claude Code SDK."""
     pass
 
@@ -105,7 +105,7 @@ async def _run_design_process(
         raise click.Abort() from e
 
 
-def _display_design_summary(app_design) -> None:
+def _display_design_summary(app_design: AppDesign) -> None:
     """Display summary of collected design information."""
     summary_panel = Panel.fit(
         f"[bold]Application:[/bold] {app_design.name}\n"

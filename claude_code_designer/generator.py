@@ -27,7 +27,9 @@ class DocumentGenerator:
                 f"Permission denied: Cannot create output directory {request.output_dir}"
             ) from e
         except OSError as e:
-            raise Exception(f"Cannot create output directory {request.output_dir}: {e}") from e
+            raise Exception(
+                f"Cannot create output directory {request.output_dir}: {e}"
+            ) from e
 
         generated_files = {}
 
@@ -53,7 +55,9 @@ class DocumentGenerator:
         except KeyboardInterrupt:
             raise
         except PermissionError as e:
-            raise Exception(f"Permission denied writing files to {output_dir}: {e}") from e
+            raise Exception(
+                f"Permission denied writing files to {output_dir}: {e}"
+            ) from e
         except OSError as e:
             raise Exception(f"Error writing files to {output_dir}: {e}") from e
 
@@ -168,7 +172,12 @@ Keep it simple and focused on user needs. Avoid unnecessary technical complexity
         except KeyboardInterrupt:
             raise
         except ConnectionError:
-            content = f"# {design.name}\n\n{design.description}\n\n## Features\n\n{', '.join([f'- {f}' for f in design.primary_features]) if design.primary_features else '- Core functionality'}\n\n*Note: Full README generation failed due to connection error. Please regenerate when connection is restored.*"
+            features = (
+                "\n".join([f"- {f}" for f in design.primary_features])
+                if design.primary_features
+                else "- Core functionality"
+            )
+            content = f"# {design.name}\n\n{design.description}\n\n## Features\n\n{features}\n\n*Note: Full README generation failed due to connection error. Please regenerate when connection is restored.*"
         except Exception as e:
             content = f"# {design.name}\n\n{design.description}\n\n*Note: README generation encountered an error: {str(e)}*"
 
