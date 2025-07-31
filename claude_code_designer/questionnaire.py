@@ -88,7 +88,7 @@ class InteractiveQuestionnaire:
 
         # Process each question
         for question in questions:
-            answer = await self._process_question(question)
+            answer = self._process_question(question)
             self.collected_data[question.id] = answer
 
             # Generate follow-up questions if needed
@@ -97,7 +97,7 @@ class InteractiveQuestionnaire:
                     question, answer
                 )
                 for fq in follow_up_questions:
-                    follow_up_answer = await self._process_question(fq)
+                    follow_up_answer = self._process_question(fq)
                     self.collected_data[fq.id] = follow_up_answer
 
         # Convert collected data to AppDesign
@@ -212,7 +212,7 @@ class InteractiveQuestionnaire:
             ),
         ]
 
-    async def _process_question(self, question: Question) -> str:
+    def _process_question(self, question: Question) -> str:
         """Process a single question and get user input."""
 
         # Display question
