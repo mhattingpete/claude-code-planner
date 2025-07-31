@@ -30,7 +30,7 @@ class DocumentGenerator:
         try:
             # Additional check for common path traversal patterns in the original string
             normalized_path = os.path.normpath(path)
-            if '..' in normalized_path or normalized_path.startswith('../'):
+            if ".." in normalized_path or normalized_path.startswith("../"):
                 raise ValueError(f"Path traversal detected in path: {path}")
 
             # Convert to absolute path and resolve any symbolic links
@@ -49,7 +49,7 @@ class DocumentGenerator:
 
                 # For absolute paths, ensure they don't contain obvious traversal patterns
                 path_parts = resolved_path.parts
-                if any(part in ('.', '..') for part in path_parts):
+                if any(part in (".", "..") for part in path_parts):
                     raise ValueError(f"Path traversal detected in path: {path}") from e
 
             return resolved_path
@@ -106,10 +106,27 @@ class DocumentGenerator:
             raise
         except PermissionError as e:
             raise Exception(
-                f"Permission denied writing files to {output_dir}: {e}"
+                f"Permission denied writing files to '{output_dir}'. "
+                f"Please check that you have write access to this directory or try a different output location. "
+                f"You can specify a different directory with --output-dir. Error details: {e}"
             ) from e
         except OSError as e:
-            raise Exception(f"Error writing files to {output_dir}: {e}") from e
+            if e.errno == 28:  # No space left on device
+                raise Exception(
+                    f"Not enough disk space to write files to '{output_dir}'. "
+                    f"Please free up disk space or choose a different output directory. Error details: {e}"
+                ) from e
+            elif e.errno == 2:  # No such file or directory
+                raise Exception(
+                    f"Output directory '{output_dir}' does not exist. "
+                    f"Please create the directory first or choose an existing directory. Error details: {e}"
+                ) from e
+            else:
+                raise Exception(
+                    f"Failed to write files to '{output_dir}'. "
+                    f"This might be due to filesystem issues, insufficient permissions, or disk space. "
+                    f"Try using a different output directory with --output-dir. Error details: {e}"
+                ) from e
 
         return generated_files
 
@@ -154,7 +171,17 @@ Keep it concise but comprehensive. Focus on essential requirements without over-
         except ConnectionError:
             content = f"# PRD for {design.name}\n\n## Executive Summary\n\n{design.description}\n\n*Note: Full PRD generation failed due to connection error. Please regenerate when connection is restored.*"
         except Exception as e:
-            content = f"# PRD for {design.name}\n\n## Executive Summary\n\n{design.description}\n\n*Note: PRD generation encountered an error: {str(e)}*"
+            error_msg = str(e).lower()
+            if "authentication" in error_msg or "unauthorized" in error_msg:
+                troubleshooting = "Please run 'claude auth login' to authenticate with Claude Code CLI."
+            elif "rate limit" in error_msg or "too many requests" in error_msg:
+                troubleshooting = "Rate limit exceeded. Please wait a few minutes before trying again."
+            elif "timeout" in error_msg or "connection" in error_msg:
+                troubleshooting = "Check your internet connection and try again. If the problem persists, Claude services may be temporarily unavailable."
+            else:
+                troubleshooting = "Check your Claude Code CLI installation with 'claude --version' and ensure you're authenticated with 'claude auth status'."
+
+            content = f"# PRD for {design.name}\n\n## Executive Summary\n\n{design.description}\n\n*Note: PRD generation failed due to an API error. {troubleshooting} Error details: {str(e)}*"
 
         return content
 
@@ -198,7 +225,17 @@ Focus on:
         except ConnectionError:
             content = f"# CLAUDE.md - {design.name}\n\n## Project Overview\n\n{design.description}\n\n*Note: Full CLAUDE.md generation failed due to connection error. Please regenerate when connection is restored.*"
         except Exception as e:
-            content = f"# CLAUDE.md - {design.name}\n\n## Project Overview\n\n{design.description}\n\n*Note: CLAUDE.md generation encountered an error: {str(e)}*"
+            error_msg = str(e).lower()
+            if "authentication" in error_msg or "unauthorized" in error_msg:
+                troubleshooting = "Please run 'claude auth login' to authenticate with Claude Code CLI."
+            elif "rate limit" in error_msg or "too many requests" in error_msg:
+                troubleshooting = "Rate limit exceeded. Please wait a few minutes before trying again."
+            elif "timeout" in error_msg or "connection" in error_msg:
+                troubleshooting = "Check your internet connection and try again. If the problem persists, Claude services may be temporarily unavailable."
+            else:
+                troubleshooting = "Check your Claude Code CLI installation with 'claude --version' and ensure you're authenticated with 'claude auth status'."
+
+            content = f"# CLAUDE.md - {design.name}\n\n## Project Overview\n\n{design.description}\n\n*Note: CLAUDE.md generation failed due to an API error. {troubleshooting} Error details: {str(e)}*"
 
         return content
 
@@ -244,6 +281,21 @@ Keep it simple and focused on user needs. Avoid unnecessary technical complexity
             )
             content = f"# {design.name}\n\n{design.description}\n\n## Features\n\n{features}\n\n*Note: Full README generation failed due to connection error. Please regenerate when connection is restored.*"
         except Exception as e:
-            content = f"# {design.name}\n\n{design.description}\n\n*Note: README generation encountered an error: {str(e)}*"
+            error_msg = str(e).lower()
+            if "authentication" in error_msg or "unauthorized" in error_msg:
+                troubleshooting = "Please run 'claude auth login' to authenticate with Claude Code CLI."
+            elif "rate limit" in error_msg or "too many requests" in error_msg:
+                troubleshooting = "Rate limit exceeded. Please wait a few minutes before trying again."
+            elif "timeout" in error_msg or "connection" in error_msg:
+                troubleshooting = "Check your internet connection and try again. If the problem persists, Claude services may be temporarily unavailable."
+            else:
+                troubleshooting = "Check your Claude Code CLI installation with 'claude --version' and ensure you're authenticated with 'claude auth status'."
+
+            features = (
+                "\n".join([f"- {f}" for f in design.primary_features])
+                if design.primary_features
+                else "- Core functionality"
+            )
+            content = f"# {design.name}\n\n{design.description}\n\n## Features\n\n{features}\n\n*Note: README generation failed due to an API error. {troubleshooting} Error details: {str(e)}*"
 
         return content
