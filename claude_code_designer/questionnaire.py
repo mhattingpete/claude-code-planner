@@ -1,6 +1,7 @@
 """Interactive question system for gathering application requirements."""
 
 import json
+import re
 from typing import Any
 
 from claude_code_sdk import query
@@ -18,6 +19,51 @@ class InteractiveQuestionnaire:
     def __init__(self) -> None:
         self.console = Console()
         self.collected_data: dict[str, Any] = {}
+
+    def _safe_json_parse(self, json_string: str) -> list[dict[str, Any]] | None:
+        """Safely parse JSON input with validation."""
+        if not json_string or not isinstance(json_string, str):
+            return None
+
+        # Remove potential harmful content and validate basic structure
+        json_string = json_string.strip()
+
+        # Basic validation: must start with [ and end with ]
+        if not (json_string.startswith('[') and json_string.endswith(']')):
+            # Try to extract JSON array from response
+            match = re.search(r'\[.*\]', json_string, re.DOTALL)
+            if not match:
+                return None
+            json_string = match.group(0)
+
+        # Length check to prevent memory exhaustion
+        if len(json_string) > 50000:  # 50KB limit
+            return None
+
+        try:
+            # Parse with strict validation
+            parsed_data = json.loads(json_string)
+
+            # Validate structure: must be a list
+            if not isinstance(parsed_data, list):
+                return None
+
+            # Validate each item is a dict with expected keys
+            for item in parsed_data:
+                if not isinstance(item, dict):
+                    return None
+                # Basic required fields validation
+                if 'id' not in item or 'text' not in item:
+                    return None
+                # Sanitize string values
+                for _key, value in item.items():
+                    if isinstance(value, str) and len(value) > 1000:  # Limit string length
+                        return None
+
+            return parsed_data
+
+        except (json.JSONDecodeError, ValueError, TypeError):
+            return None
 
     async def run_questionnaire(self) -> AppDesign:
         """Run the complete questionnaire process and return AppDesign."""
@@ -93,8 +139,13 @@ class InteractiveQuestionnaire:
                 if hasattr(query_stream, "aclose"):
                     await query_stream.aclose()
 
-            # Parse JSON and create Question objects
-            questions_data = json.loads(questions_json.strip())
+            # Parse JSON safely and create Question objects
+            questions_data = self._safe_json_parse(questions_json)
+            if not questions_data:
+                self.console.print(
+                    "[yellow]Invalid or unsafe JSON response from Claude. Using default questions.[/yellow]"
+                )
+                return self._get_default_questions()
             return [Question(**q) for q in questions_data]
 
         except KeyboardInterrupt:
@@ -102,11 +153,6 @@ class InteractiveQuestionnaire:
                 "\n[yellow]Question generation interrupted by user[/yellow]"
             )
             raise
-        except json.JSONDecodeError:
-            self.console.print(
-                "[yellow]Invalid JSON response from Claude. Using default questions.[/yellow]"
-            )
-            return self._get_default_questions()
         except ConnectionError:
             self.console.print(
                 "[yellow]Network connection error. Using default questions.[/yellow]"
@@ -234,16 +280,16 @@ class InteractiveQuestionnaire:
                 if hasattr(query_stream, "aclose"):
                     await query_stream.aclose()
 
-            questions_data = json.loads(questions_json.strip())
+            questions_data = self._safe_json_parse(questions_json)
+            if not questions_data:
+                self.console.print(
+                    "[dim]Unable to generate follow-up questions due to invalid or unsafe response[/dim]"
+                )
+                return []
             return [Question(**q) for q in questions_data]
 
         except KeyboardInterrupt:
             raise
-        except json.JSONDecodeError:
-            self.console.print(
-                "[dim]Unable to generate follow-up questions due to invalid response[/dim]"
-            )
-            return []
         except ConnectionError:
             self.console.print(
                 "[dim]Unable to generate follow-up questions due to connection error[/dim]"
