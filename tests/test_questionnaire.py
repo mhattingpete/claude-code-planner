@@ -541,7 +541,7 @@ class TestInteractiveQuestionnaire:
         assert result == "Option 1"
         assert mock_prompt.call_count == 2
 
-    async def test_process_question_unknown_type(self, questionnaire):
+    def test_process_question_unknown_type(self, questionnaire):
         """Test _process_question with unknown question type."""
         question = Question(
             id="test",
@@ -551,7 +551,7 @@ class TestInteractiveQuestionnaire:
 
         with patch("claude_code_designer.questionnaire.Prompt.ask") as mock_prompt:
             mock_prompt.return_value = "default answer"
-            result = await questionnaire._process_question(question)
+            result = questionnaire._process_question(question)
 
         assert result == "default answer"
         mock_prompt.assert_called_once_with("Answer", default="")
@@ -656,7 +656,9 @@ class TestInteractiveQuestionnaire:
     def test_split_and_clean_list_edge_cases(self, questionnaire):
         """Test _split_and_clean_list with edge cases containing commas."""
         # Test quoted values with commas
-        result = questionnaire._split_and_clean_list('"item, with comma", regular, "another, with comma"')
+        result = questionnaire._split_and_clean_list(
+            '"item, with comma", regular, "another, with comma"'
+        )
         assert result == ["item, with comma", "regular", "another, with comma"]
 
         # Test single quoted value with comma
@@ -664,7 +666,9 @@ class TestInteractiveQuestionnaire:
         assert result == ["single item, with comma"]
 
         # Test mixed quoted and unquoted
-        result = questionnaire._split_and_clean_list('unquoted, "quoted, item", another')
+        result = questionnaire._split_and_clean_list(
+            'unquoted, "quoted, item", another'
+        )
         assert result == ["unquoted", "quoted, item", "another"]
 
         # Test empty quoted strings
@@ -845,7 +849,9 @@ class TestInteractiveQuestionnaire:
 
             app_design = await questionnaire.run_questionnaire()
 
-            assert app_design.name == "web-application"  # Intelligent default since no app_name
+            assert (
+                app_design.name == "web-application"
+            )  # Intelligent default since no app_name
             assert questionnaire.collected_data["app_type"] == "Web App"
             assert questionnaire.collected_data["web_framework"] == "Django"
 
@@ -856,7 +862,9 @@ class TestInteractiveQuestionnaire:
         name = questionnaire._generate_intelligent_app_name("CLI Tool")
         assert name == "utility-cli"
 
-        questionnaire.collected_data = {"primary_purpose": "process manager for services"}
+        questionnaire.collected_data = {
+            "primary_purpose": "process manager for services"
+        }
         name = questionnaire._generate_intelligent_app_name("cli tool")
         assert name == "process-manager"
 
@@ -888,7 +896,9 @@ class TestInteractiveQuestionnaire:
         name = questionnaire._generate_intelligent_app_name("Mobile App")
         assert name == "social-mobile-app"
 
-        questionnaire.collected_data = {"primary_purpose": "task management for productivity"}
+        questionnaire.collected_data = {
+            "primary_purpose": "task management for productivity"
+        }
         name = questionnaire._generate_intelligent_app_name("mobile")
         assert name == "productivity-app"
 
@@ -904,7 +914,9 @@ class TestInteractiveQuestionnaire:
         name = questionnaire._generate_intelligent_app_name("Web Application")
         assert name == "admin-dashboard"
 
-        questionnaire.collected_data = {"primary_purpose": "ecommerce shop for products"}
+        questionnaire.collected_data = {
+            "primary_purpose": "ecommerce shop for products"
+        }
         name = questionnaire._generate_intelligent_app_name("web app")
         assert name == "web-store"
 

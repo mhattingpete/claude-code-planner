@@ -415,7 +415,7 @@ class TestDocumentGenerator:
         """Test that hidden path traversal attempts are blocked."""
         malicious_paths = [
             "output/..%2Fetc%2Fpasswd",  # URL encoded
-            "output/....//etc/passwd",   # Double dots with slash
+            "output/....//etc/passwd",  # Double dots with slash
         ]
 
         # These should be handled by normpath check
