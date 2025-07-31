@@ -1,6 +1,7 @@
 """Interactive question system for gathering application requirements."""
 
 import json
+import re
 from typing import Any
 
 from claude_code_sdk import query
@@ -18,6 +19,53 @@ class InteractiveQuestionnaire:
     def __init__(self) -> None:
         self.console = Console()
         self.collected_data: dict[str, Any] = {}
+
+    def _safe_json_parse(self, json_string: str) -> list[dict[str, Any]] | None:
+        """Safely parse JSON input with validation."""
+        if not json_string or not isinstance(json_string, str):
+            return None
+
+        # Remove potential harmful content and validate basic structure
+        json_string = json_string.strip()
+
+        # Basic validation: must start with [ and end with ]
+        if not (json_string.startswith("[") and json_string.endswith("]")):
+            # Try to extract JSON array from response
+            match = re.search(r"\[.*\]", json_string, re.DOTALL)
+            if not match:
+                return None
+            json_string = match.group(0)
+
+        # Length check to prevent memory exhaustion
+        if len(json_string) > 50000:  # 50KB limit
+            return None
+
+        try:
+            # Parse with strict validation
+            parsed_data = json.loads(json_string)
+
+            # Validate structure: must be a list
+            if not isinstance(parsed_data, list):
+                return None
+
+            # Validate each item is a dict with expected keys
+            for item in parsed_data:
+                if not isinstance(item, dict):
+                    return None
+                # Basic required fields validation
+                if "id" not in item or "text" not in item:
+                    return None
+                # Sanitize string values
+                for _key, value in item.items():
+                    if (
+                        isinstance(value, str) and len(value) > 1000
+                    ):  # Limit string length
+                        return None
+
+            return parsed_data
+
+        except (json.JSONDecodeError, ValueError, TypeError):
+            return None
 
     async def run_questionnaire(self) -> AppDesign:
         """Run the complete questionnaire process and return AppDesign."""
@@ -82,14 +130,24 @@ class InteractiveQuestionnaire:
 
         try:
             questions_json = ""
-            async for message in query(prompt=prompt):
-                if hasattr(message, "content"):
-                    questions_json += message.content
-                else:
-                    questions_json += str(message)
+            query_stream = query(prompt=prompt)
+            try:
+                async for message in query_stream:
+                    if hasattr(message, "content"):
+                        questions_json += message.content
+                    else:
+                        questions_json += str(message)
+            finally:
+                if hasattr(query_stream, "aclose"):
+                    await query_stream.aclose()
 
-            # Parse JSON and create Question objects
-            questions_data = json.loads(questions_json.strip())
+            # Parse JSON safely and create Question objects
+            questions_data = self._safe_json_parse(questions_json)
+            if not questions_data:
+                self.console.print(
+                    "[yellow]Invalid or unsafe JSON response from Claude. Using default questions.[/yellow]"
+                )
+                return self._get_default_questions()
             return [Question(**q) for q in questions_data]
 
         except KeyboardInterrupt:
@@ -97,11 +155,6 @@ class InteractiveQuestionnaire:
                 "\n[yellow]Question generation interrupted by user[/yellow]"
             )
             raise
-        except json.JSONDecodeError:
-            self.console.print(
-                "[yellow]Invalid JSON response from Claude. Using default questions.[/yellow]"
-            )
-            return self._get_default_questions()
         except ConnectionError:
             self.console.print(
                 "[yellow]Network connection error. Using default questions.[/yellow]"
@@ -218,22 +271,27 @@ class InteractiveQuestionnaire:
 
         try:
             questions_json = ""
-            async for message in query(prompt=prompt):
-                if hasattr(message, "content"):
-                    questions_json += message.content
-                else:
-                    questions_json += str(message)
+            query_stream = query(prompt=prompt)
+            try:
+                async for message in query_stream:
+                    if hasattr(message, "content"):
+                        questions_json += message.content
+                    else:
+                        questions_json += str(message)
+            finally:
+                if hasattr(query_stream, "aclose"):
+                    await query_stream.aclose()
 
-            questions_data = json.loads(questions_json.strip())
+            questions_data = self._safe_json_parse(questions_json)
+            if not questions_data:
+                self.console.print(
+                    "[dim]Unable to generate follow-up questions due to invalid or unsafe response[/dim]"
+                )
+                return []
             return [Question(**q) for q in questions_data]
 
         except KeyboardInterrupt:
             raise
-        except json.JSONDecodeError:
-            self.console.print(
-                "[dim]Unable to generate follow-up questions due to invalid response[/dim]"
-            )
-            return []
         except ConnectionError:
             self.console.print(
                 "[dim]Unable to generate follow-up questions due to connection error[/dim]"
@@ -242,41 +300,189 @@ class InteractiveQuestionnaire:
         except Exception:
             return []
 
+    def _validate_collected_data(self) -> dict[str, str]:
+        """Validate and sanitize collected data."""
+        validation_errors = {}
+
+        if not isinstance(self.collected_data, dict):
+            validation_errors["collected_data"] = "Collected data must be a dictionary"
+            return validation_errors
+
+        # Validate each field
+        for key, value in self.collected_data.items():
+            if not isinstance(key, str):
+                validation_errors[str(key)] = "All keys must be strings"
+                continue
+
+            # Validate string length limits
+            if isinstance(value, str):
+                if len(value) > 10000:  # 10KB limit per field
+                    validation_errors[key] = (
+                        f"Field '{key}' exceeds maximum length (10,000 characters)"
+                    )
+                # Sanitize potential dangerous characters
+                if any(char in value for char in ["\x00", "\x08", "\x0b", "\x0c"]):
+                    validation_errors[key] = (
+                        f"Field '{key}' contains invalid control characters"
+                    )
+            elif value is not None and not isinstance(value, str | int | float | bool):
+                validation_errors[key] = (
+                    f"Field '{key}' must be a string, number, boolean, or None"
+                )
+
+        return validation_errors
+
+    def _sanitize_string_value(self, value: Any) -> str:
+        """Safely convert and sanitize a value to string."""
+        if value is None:
+            return ""
+        if isinstance(value, str):
+            # Remove control characters and limit length
+            sanitized = "".join(
+                char for char in value if ord(char) >= 32 or char in ["\n", "\t"]
+            )
+            return sanitized[:10000]  # Limit to 10KB
+        if isinstance(value, int | float | bool):
+            return str(value)
+        # For other types, convert safely
+        return str(value)[:10000]
+
+    def _split_and_clean_list(self, value: str) -> list[str]:
+        """Split string value and clean up the resulting list."""
+        if not value:
+            return []
+        # Split by comma and clean up items
+        items = []
+        for item in value.split(","):
+            cleaned = item.strip()
+            if cleaned and len(cleaned) <= 1000:  # Limit individual item length
+                items.append(cleaned)
+        return items[:50]  # Limit to 50 items max
+
+    def _generate_intelligent_app_name(self, app_type: str) -> str:
+        """Generate contextually appropriate app name based on type and purpose."""
+        app_type = app_type.lower()
+        purpose = self._sanitize_string_value(
+            self.collected_data.get("primary_purpose", "")
+        ).lower()
+
+        # Type-specific intelligent defaults
+        if "cli" in app_type or "command" in app_type:
+            if "tool" in purpose or "utility" in purpose:
+                return "utility-cli"
+            elif "process" in purpose or "manage" in purpose:
+                return "process-manager"
+            return "command-line-tool"
+        elif "api" in app_type or "service" in app_type:
+            if "data" in purpose or "database" in purpose:
+                return "data-service"
+            elif "auth" in purpose or "user" in purpose:
+                return "auth-service"
+            return "api-service"
+        elif "mobile" in app_type:
+            if "social" in purpose or "chat" in purpose:
+                return "social-mobile-app"
+            elif "productivity" in purpose or "task" in purpose:
+                return "productivity-app"
+            return "mobile-application"
+        else:  # Web application or default
+            if "dashboard" in purpose or "admin" in purpose:
+                return "admin-dashboard"
+            elif "shop" in purpose or "ecommerce" in purpose:
+                return "web-store"
+            elif "blog" in purpose or "content" in purpose:
+                return "content-platform"
+            return "web-application"
+
     def _create_app_design(self) -> AppDesign:
-        """Convert collected data into AppDesign model."""
+        """Convert collected data into AppDesign model with validation."""
 
-        # Extract basic information
-        name = self.collected_data.get("app_name", "My Application")
-        app_type = self.collected_data.get("app_type", "Web Application").lower()
-        description = self.collected_data.get("primary_purpose", "")
-        target_audience = self.collected_data.get("target_audience")
+        # Validate collected data first
+        validation_errors = self._validate_collected_data()
+        if validation_errors:
+            error_msg = "\n".join(
+                [f"- {field}: {error}" for field, error in validation_errors.items()]
+            )
+            self.console.print(f"[red]Data validation errors:\n{error_msg}[/red]")
+            self.console.print(
+                "[yellow]Using default values for invalid fields...[/yellow]"
+            )
 
-        # Extract features and goals from various fields
+        # Extract and sanitize basic information with intelligent defaults
+        app_type_raw = self._sanitize_string_value(
+            self.collected_data.get("app_type", "Web Application")
+        )
+        app_type = app_type_raw.lower() if app_type_raw else "web application"
+
+        name = self._sanitize_string_value(
+            self.collected_data.get("app_name", self._generate_intelligent_app_name(app_type))
+        )
+        if not name.strip():
+            name = self._generate_intelligent_app_name(app_type)
+
+        description = self._sanitize_string_value(
+            self.collected_data.get("primary_purpose", "")
+        )
+        target_audience = self._sanitize_string_value(
+            self.collected_data.get("target_audience")
+        )
+
+        # Extract features and goals from various fields with validation
         primary_features = []
         goals = []
         tech_stack = []
         constraints = []
 
-        # Process all collected data
+        # Process all collected data safely
         for key, value in self.collected_data.items():
-            if value and isinstance(value, str):
-                if "feature" in key.lower():
-                    primary_features.extend([f.strip() for f in value.split(",")])
-                elif "goal" in key.lower() or "objective" in key.lower():
-                    goals.extend([g.strip() for g in value.split(",")])
-                elif "tech" in key.lower() or "stack" in key.lower():
-                    tech_stack.extend([t.strip() for t in value.split(",")])
-                elif "constraint" in key.lower() or "limitation" in key.lower():
-                    constraints.extend([c.strip() for c in value.split(",")])
+            if not isinstance(key, str):
+                continue
 
-        return AppDesign(
-            name=name,
-            type=app_type,
-            description=description,
-            primary_features=primary_features,
-            tech_stack=tech_stack,
-            target_audience=target_audience,
-            goals=goals,
-            constraints=constraints,
-            additional_info=self.collected_data,
-        )
+            sanitized_value = self._sanitize_string_value(value)
+            if sanitized_value:
+                key_lower = key.lower()
+                if "feature" in key_lower:
+                    primary_features.extend(self._split_and_clean_list(sanitized_value))
+                elif "goal" in key_lower or "objective" in key_lower:
+                    goals.extend(self._split_and_clean_list(sanitized_value))
+                elif "tech" in key_lower or "stack" in key_lower:
+                    tech_stack.extend(self._split_and_clean_list(sanitized_value))
+                elif "constraint" in key_lower or "limitation" in key_lower:
+                    constraints.extend(self._split_and_clean_list(sanitized_value))
+
+        # Validate required fields
+        if not name.strip():
+            self.console.print(
+                "[yellow]Warning: Application name is empty, using intelligent default[/yellow]"
+            )
+            name = self._generate_intelligent_app_name(app_type)
+
+        try:
+            return AppDesign(
+                name=name,
+                type=app_type,
+                description=description,
+                primary_features=primary_features,
+                tech_stack=tech_stack,
+                target_audience=target_audience if target_audience else None,
+                goals=goals,
+                constraints=constraints,
+                additional_info=self.collected_data,
+            )
+        except Exception as e:
+            self.console.print(f"[red]Error creating AppDesign: {e}[/red]")
+            self.console.print(
+                "[yellow]Using minimal default configuration...[/yellow]"
+            )
+            # Return minimal valid AppDesign as fallback
+            return AppDesign(
+                name="web-application",
+                type="web application",
+                description="A software application",
+                primary_features=[],
+                tech_stack=[],
+                target_audience=None,
+                goals=[],
+                constraints=[],
+                additional_info={},
+            )
