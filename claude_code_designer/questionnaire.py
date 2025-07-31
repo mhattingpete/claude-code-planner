@@ -10,6 +10,19 @@ from rich.panel import Panel
 from rich.prompt import IntPrompt, Prompt
 from rich.table import Table
 
+from .constants import (
+    ALLOWED_CONTROL_CHARS,
+    DEFAULT_APP_DESCRIPTION,
+    DEFAULT_APP_TYPE,
+    DEFAULT_QUESTION_OPTIONS,
+    INTELLIGENT_APP_NAMES,
+    INVALID_CONTROL_CHARS,
+    MAX_FIELD_LENGTH,
+    MAX_ITEM_LENGTH,
+    MAX_JSON_SIZE,
+    MAX_LIST_ITEMS,
+    PANEL_STYLES,
+)
 from .models import AppDesign, Question
 
 
@@ -37,7 +50,7 @@ class InteractiveQuestionnaire:
             json_string = match.group(0)
 
         # Length check to prevent memory exhaustion
-        if len(json_string) > 50000:  # 50KB limit
+        if len(json_string) > MAX_JSON_SIZE:
             return None
 
         try:
@@ -58,8 +71,8 @@ class InteractiveQuestionnaire:
                 # Sanitize string values
                 for _key, value in item.items():
                     if (
-                        isinstance(value, str) and len(value) > 1000
-                    ):  # Limit string length
+                        isinstance(value, str) and len(value) > MAX_ITEM_LENGTH
+                    ):
                         return None
 
             return parsed_data
@@ -98,7 +111,7 @@ class InteractiveQuestionnaire:
             "[bold blue]Welcome to Claude Code Designer[/bold blue]\n\n"
             "Let's design your application...",
             title="Getting Started",
-            border_style="blue",
+            border_style=PANEL_STYLES["welcome"],
         )
         self.console.print(welcome_panel)
         self.console.print()
@@ -173,7 +186,7 @@ class InteractiveQuestionnaire:
                 id="app_type",
                 text="What type of application?",
                 type="multiple_choice",
-                options=["Web Application", "CLI Tool", "API Service", "Mobile App"],
+                options=DEFAULT_QUESTION_OPTIONS["app_type"],
                 required=True,
             ),
             Question(
@@ -203,7 +216,7 @@ class InteractiveQuestionnaire:
         question_panel = Panel.fit(
             f"[bold]{question.text}[/bold]",
             title=f"Question {question.id}",
-            border_style="cyan",
+            border_style=PANEL_STYLES["question"],
         )
         self.console.print(question_panel)
 
@@ -316,12 +329,12 @@ class InteractiveQuestionnaire:
 
             # Validate string length limits
             if isinstance(value, str):
-                if len(value) > 10000:  # 10KB limit per field
+                if len(value) > MAX_FIELD_LENGTH:
                     validation_errors[key] = (
-                        f"Field '{key}' exceeds maximum length (10,000 characters)"
+                        f"Field '{key}' exceeds maximum length ({MAX_FIELD_LENGTH:,} characters)"
                     )
                 # Sanitize potential dangerous characters
-                if any(char in value for char in ["\x00", "\x08", "\x0b", "\x0c"]):
+                if any(char in value for char in INVALID_CONTROL_CHARS):
                     validation_errors[key] = (
                         f"Field '{key}' contains invalid control characters"
                     )
@@ -339,13 +352,13 @@ class InteractiveQuestionnaire:
         if isinstance(value, str):
             # Remove control characters and limit length
             sanitized = "".join(
-                char for char in value if ord(char) >= 32 or char in ["\n", "\t"]
+                char for char in value if ord(char) >= 32 or char in ALLOWED_CONTROL_CHARS
             )
-            return sanitized[:10000]  # Limit to 10KB
+            return sanitized[:MAX_FIELD_LENGTH]
         if isinstance(value, int | float | bool):
             return str(value)
         # For other types, convert safely
-        return str(value)[:10000]
+        return str(value)[:MAX_FIELD_LENGTH]
 
     def _split_and_clean_list(self, value: str) -> list[str]:
         """Split string value and clean up the resulting list."""
@@ -365,7 +378,7 @@ class InteractiveQuestionnaire:
                     # Remove surrounding quotes if they exist (for fallback cases)
                     if cleaned.startswith('"') and cleaned.endswith('"') and len(cleaned) > 1:
                         cleaned = cleaned[1:-1]
-                    if cleaned and len(cleaned) <= 1000:  # Limit individual item length
+                    if cleaned and len(cleaned) <= MAX_ITEM_LENGTH:
                         items.append(cleaned)
         except csv.Error:
             # Fallback to simple splitting if CSV parsing fails
@@ -374,10 +387,10 @@ class InteractiveQuestionnaire:
                 # Remove surrounding quotes if they exist
                 if cleaned.startswith('"') and cleaned.endswith('"') and len(cleaned) > 1:
                     cleaned = cleaned[1:-1]
-                if cleaned and len(cleaned) <= 1000:  # Limit individual item length
+                if cleaned and len(cleaned) <= MAX_ITEM_LENGTH:
                     items.append(cleaned)
 
-        return items[:50]  # Limit to 50 items max
+        return items[:MAX_LIST_ITEMS]
 
     def _generate_intelligent_app_name(self, app_type: str) -> str:
         """Generate contextually appropriate app name based on type and purpose."""
@@ -386,33 +399,24 @@ class InteractiveQuestionnaire:
             self.collected_data.get("primary_purpose", "")
         ).lower()
 
-        # Type-specific intelligent defaults
+        # Determine the app category
         if "cli" in app_type or "command" in app_type:
-            if "tool" in purpose or "utility" in purpose:
-                return "utility-cli"
-            elif "process" in purpose or "manage" in purpose:
-                return "process-manager"
-            return "command-line-tool"
+            category = "cli"
         elif "api" in app_type or "service" in app_type:
-            if "data" in purpose or "database" in purpose:
-                return "data-service"
-            elif "auth" in purpose or "user" in purpose:
-                return "auth-service"
-            return "api-service"
+            category = "api"
         elif "mobile" in app_type:
-            if "social" in purpose or "chat" in purpose:
-                return "social-mobile-app"
-            elif "productivity" in purpose or "task" in purpose:
-                return "productivity-app"
-            return "mobile-application"
-        else:  # Web application or default
-            if "dashboard" in purpose or "admin" in purpose:
-                return "admin-dashboard"
-            elif "shop" in purpose or "ecommerce" in purpose:
-                return "web-store"
-            elif "blog" in purpose or "content" in purpose:
-                return "content-platform"
-            return "web-application"
+            category = "mobile"
+        else:
+            category = "web"
+
+        # Find matching purpose keywords
+        category_names = INTELLIGENT_APP_NAMES[category]
+        for keyword, name in category_names.items():
+            if keyword != "default" and keyword in purpose:
+                return name
+
+        # Return default for category
+        return category_names["default"]
 
     def _create_app_design(self) -> AppDesign:
         """Convert collected data into AppDesign model with validation."""
@@ -430,9 +434,9 @@ class InteractiveQuestionnaire:
 
         # Extract and sanitize basic information with intelligent defaults
         app_type_raw = self._sanitize_string_value(
-            self.collected_data.get("app_type", "Web Application")
+            self.collected_data.get("app_type", DEFAULT_APP_TYPE)
         )
-        app_type = app_type_raw.lower() if app_type_raw else "web application"
+        app_type = app_type_raw.lower() if app_type_raw else DEFAULT_APP_TYPE.lower()
 
         name = self._sanitize_string_value(
             self.collected_data.get("app_name", self._generate_intelligent_app_name(app_type))
@@ -496,9 +500,9 @@ class InteractiveQuestionnaire:
             )
             # Return minimal valid AppDesign as fallback
             return AppDesign(
-                name="web-application",
-                type="web application",
-                description="A software application",
+                name=INTELLIGENT_APP_NAMES["web"]["default"],
+                type=DEFAULT_APP_TYPE.lower(),
+                description=DEFAULT_APP_DESCRIPTION,
                 primary_features=[],
                 tech_stack=[],
                 target_audience=None,

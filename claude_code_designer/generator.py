@@ -5,6 +5,7 @@ from pathlib import Path
 
 from claude_code_sdk import query
 
+from .constants import DEFAULT_ENCODING, DOCUMENT_TYPES, ERROR_MESSAGES
 from .models import AppDesign, DocumentRequest
 
 
@@ -86,20 +87,20 @@ class DocumentGenerator:
         try:
             if request.generate_prd:
                 prd_content = await self._generate_prd(request.app_design)
-                prd_path = output_dir / "PRD.md"
-                prd_path.write_text(prd_content, encoding="utf-8")
+                prd_path = output_dir / DOCUMENT_TYPES["PRD"]
+                prd_path.write_text(prd_content, encoding=DEFAULT_ENCODING)
                 generated_files["PRD"] = str(prd_path)
 
             if request.generate_claude_md:
                 claude_md_content = await self._generate_claude_md(request.app_design)
-                claude_md_path = output_dir / "CLAUDE.md"
-                claude_md_path.write_text(claude_md_content, encoding="utf-8")
+                claude_md_path = output_dir / DOCUMENT_TYPES["CLAUDE_MD"]
+                claude_md_path.write_text(claude_md_content, encoding=DEFAULT_ENCODING)
                 generated_files["CLAUDE.md"] = str(claude_md_path)
 
             if request.generate_readme:
                 readme_content = await self._generate_readme(request.app_design)
-                readme_path = output_dir / "README.md"
-                readme_path.write_text(readme_content, encoding="utf-8")
+                readme_path = output_dir / DOCUMENT_TYPES["README"]
+                readme_path.write_text(readme_content, encoding=DEFAULT_ENCODING)
                 generated_files["README"] = str(readme_path)
 
         except KeyboardInterrupt:
@@ -173,13 +174,13 @@ Keep it concise but comprehensive. Focus on essential requirements without over-
         except Exception as e:
             error_msg = str(e).lower()
             if "authentication" in error_msg or "unauthorized" in error_msg:
-                troubleshooting = "Please run 'claude auth login' to authenticate with Claude Code CLI."
+                troubleshooting = ERROR_MESSAGES["authentication"]
             elif "rate limit" in error_msg or "too many requests" in error_msg:
-                troubleshooting = "Rate limit exceeded. Please wait a few minutes before trying again."
+                troubleshooting = ERROR_MESSAGES["rate_limit"]
             elif "timeout" in error_msg or "connection" in error_msg:
-                troubleshooting = "Check your internet connection and try again. If the problem persists, Claude services may be temporarily unavailable."
+                troubleshooting = ERROR_MESSAGES["timeout"]
             else:
-                troubleshooting = "Check your Claude Code CLI installation with 'claude --version' and ensure you're authenticated with 'claude auth status'."
+                troubleshooting = ERROR_MESSAGES["default"]
 
             content = f"# PRD for {design.name}\n\n## Executive Summary\n\n{design.description}\n\n*Note: PRD generation failed due to an API error. {troubleshooting} Error details: {str(e)}*"
 
@@ -227,13 +228,13 @@ Focus on:
         except Exception as e:
             error_msg = str(e).lower()
             if "authentication" in error_msg or "unauthorized" in error_msg:
-                troubleshooting = "Please run 'claude auth login' to authenticate with Claude Code CLI."
+                troubleshooting = ERROR_MESSAGES["authentication"]
             elif "rate limit" in error_msg or "too many requests" in error_msg:
-                troubleshooting = "Rate limit exceeded. Please wait a few minutes before trying again."
+                troubleshooting = ERROR_MESSAGES["rate_limit"]
             elif "timeout" in error_msg or "connection" in error_msg:
-                troubleshooting = "Check your internet connection and try again. If the problem persists, Claude services may be temporarily unavailable."
+                troubleshooting = ERROR_MESSAGES["timeout"]
             else:
-                troubleshooting = "Check your Claude Code CLI installation with 'claude --version' and ensure you're authenticated with 'claude auth status'."
+                troubleshooting = ERROR_MESSAGES["default"]
 
             content = f"# CLAUDE.md - {design.name}\n\n## Project Overview\n\n{design.description}\n\n*Note: CLAUDE.md generation failed due to an API error. {troubleshooting} Error details: {str(e)}*"
 
@@ -283,13 +284,13 @@ Keep it simple and focused on user needs. Avoid unnecessary technical complexity
         except Exception as e:
             error_msg = str(e).lower()
             if "authentication" in error_msg or "unauthorized" in error_msg:
-                troubleshooting = "Please run 'claude auth login' to authenticate with Claude Code CLI."
+                troubleshooting = ERROR_MESSAGES["authentication"]
             elif "rate limit" in error_msg or "too many requests" in error_msg:
-                troubleshooting = "Rate limit exceeded. Please wait a few minutes before trying again."
+                troubleshooting = ERROR_MESSAGES["rate_limit"]
             elif "timeout" in error_msg or "connection" in error_msg:
-                troubleshooting = "Check your internet connection and try again. If the problem persists, Claude services may be temporarily unavailable."
+                troubleshooting = ERROR_MESSAGES["timeout"]
             else:
-                troubleshooting = "Check your Claude Code CLI installation with 'claude --version' and ensure you're authenticated with 'claude auth status'."
+                troubleshooting = ERROR_MESSAGES["default"]
 
             features = (
                 "\n".join([f"- {f}" for f in design.primary_features])

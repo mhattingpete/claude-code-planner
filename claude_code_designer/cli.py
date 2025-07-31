@@ -8,6 +8,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
+from .constants import DEFAULT_OUTPUT_DIR, PANEL_STYLES
 from .generator import DocumentGenerator
 from .models import AppDesign, DocumentRequest
 from .questionnaire import InteractiveQuestionnaire
@@ -25,7 +26,7 @@ def main() -> None:
 @main.command()
 @click.option(
     "--output-dir",
-    default=".",
+    default=DEFAULT_OUTPUT_DIR,
     help="Output directory for generated documents",
     type=click.Path(exists=False, file_okay=False, dir_okay=True, path_type=Path),
 )
@@ -114,7 +115,7 @@ def _display_design_summary(app_design: AppDesign) -> None:
         f"[bold]Features:[/bold] {', '.join(app_design.primary_features) or 'None specified'}\n"
         f"[bold]Tech Stack:[/bold] {', '.join(app_design.tech_stack) or 'None specified'}",
         title="Design Summary",
-        border_style="green",
+        border_style=PANEL_STYLES["summary"],
     )
     console.print(summary_panel)
 
@@ -165,7 +166,7 @@ def info() -> None:
         "  claude-designer design --output-dir ./my-project\n"
         "  claude-designer design --skip-prd --skip-readme",
         title="Information",
-        border_style="blue",
+        border_style=PANEL_STYLES["info"],
     )
     console.print(info_panel)
 
