@@ -541,7 +541,7 @@ class TestInteractiveQuestionnaire:
         assert result == "Option 1"
         assert mock_prompt.call_count == 2
 
-    async def test_process_question_unknown_type(self, questionnaire):
+    def test_process_question_unknown_type(self, questionnaire):
         """Test _process_question with unknown question type."""
         question = Question(
             id="test",
@@ -551,7 +551,7 @@ class TestInteractiveQuestionnaire:
 
         with patch("claude_code_designer.questionnaire.Prompt.ask") as mock_prompt:
             mock_prompt.return_value = "default answer"
-            result = await questionnaire._process_question(question)
+            result = questionnaire._process_question(question)
 
         assert result == "default answer"
         mock_prompt.assert_called_once_with("Answer", default="")
