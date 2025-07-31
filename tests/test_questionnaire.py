@@ -343,7 +343,7 @@ class TestInteractiveQuestionnaire:
 
         app_design = questionnaire._create_app_design()
 
-        assert app_design.name == "My Application"  # Default
+        assert app_design.name == "web-application"  # Intelligent default
         assert app_design.type == "web application"  # Default
         assert app_design.description == ""  # Default empty
         assert app_design.target_audience is None
@@ -663,8 +663,8 @@ class TestInteractiveQuestionnaire:
 
         app_design = questionnaire._create_app_design()
 
-        # Should still create a valid AppDesign with defaults
-        assert app_design.name == "My Application"
+        # Should still create a valid AppDesign with intelligent defaults
+        assert app_design.name == "web-application"
         assert app_design.type == "web application"
 
     def test_create_app_design_empty_name_fallback(self, questionnaire):
@@ -673,7 +673,7 @@ class TestInteractiveQuestionnaire:
 
         app_design = questionnaire._create_app_design()
 
-        assert app_design.name == "My Application"
+        assert app_design.name == "web-application"
 
     def test_create_app_design_feature_extraction(self, questionnaire):
         """Test _create_app_design feature extraction from various fields."""
@@ -709,8 +709,8 @@ class TestInteractiveQuestionnaire:
 
         app_design = questionnaire._create_app_design()
 
-        # Should use default name
-        assert app_design.name == "My Application"
+        # Should use intelligent default name
+        assert app_design.name == "web-application"
 
     @patch("claude_code_designer.questionnaire.query")
     async def test_generate_questions_message_without_content(
@@ -819,6 +819,74 @@ class TestInteractiveQuestionnaire:
 
             app_design = await questionnaire.run_questionnaire()
 
-            assert app_design.name == "My Application"  # Default since no app_name
+            assert app_design.name == "web-application"  # Intelligent default since no app_name
             assert questionnaire.collected_data["app_type"] == "Web App"
             assert questionnaire.collected_data["web_framework"] == "Django"
+
+    def test_generate_intelligent_app_name_cli_tool(self, questionnaire):
+        """Test intelligent app name generation for CLI tools."""
+        questionnaire.collected_data = {"primary_purpose": "build automation tool"}
+
+        name = questionnaire._generate_intelligent_app_name("CLI Tool")
+        assert name == "utility-cli"
+
+        questionnaire.collected_data = {"primary_purpose": "process manager for services"}
+        name = questionnaire._generate_intelligent_app_name("cli tool")
+        assert name == "process-manager"
+
+        # Default CLI case
+        questionnaire.collected_data = {}
+        name = questionnaire._generate_intelligent_app_name("command line")
+        assert name == "command-line-tool"
+
+    def test_generate_intelligent_app_name_api_service(self, questionnaire):
+        """Test intelligent app name generation for API services."""
+        questionnaire.collected_data = {"primary_purpose": "user authentication system"}
+
+        name = questionnaire._generate_intelligent_app_name("API Service")
+        assert name == "auth-service"
+
+        questionnaire.collected_data = {"primary_purpose": "database management system"}
+        name = questionnaire._generate_intelligent_app_name("api")
+        assert name == "data-service"
+
+        # Default API case
+        questionnaire.collected_data = {}
+        name = questionnaire._generate_intelligent_app_name("service")
+        assert name == "api-service"
+
+    def test_generate_intelligent_app_name_mobile_app(self, questionnaire):
+        """Test intelligent app name generation for mobile apps."""
+        questionnaire.collected_data = {"primary_purpose": "social networking platform"}
+
+        name = questionnaire._generate_intelligent_app_name("Mobile App")
+        assert name == "social-mobile-app"
+
+        questionnaire.collected_data = {"primary_purpose": "task management for productivity"}
+        name = questionnaire._generate_intelligent_app_name("mobile")
+        assert name == "productivity-app"
+
+        # Default mobile case
+        questionnaire.collected_data = {}
+        name = questionnaire._generate_intelligent_app_name("mobile app")
+        assert name == "mobile-application"
+
+    def test_generate_intelligent_app_name_web_application(self, questionnaire):
+        """Test intelligent app name generation for web applications."""
+        questionnaire.collected_data = {"primary_purpose": "admin dashboard for users"}
+
+        name = questionnaire._generate_intelligent_app_name("Web Application")
+        assert name == "admin-dashboard"
+
+        questionnaire.collected_data = {"primary_purpose": "ecommerce shop for products"}
+        name = questionnaire._generate_intelligent_app_name("web app")
+        assert name == "web-store"
+
+        questionnaire.collected_data = {"primary_purpose": "blog content management"}
+        name = questionnaire._generate_intelligent_app_name("web")
+        assert name == "content-platform"
+
+        # Default web case
+        questionnaire.collected_data = {}
+        name = questionnaire._generate_intelligent_app_name("unknown type")
+        assert name == "web-application"

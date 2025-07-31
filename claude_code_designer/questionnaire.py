@@ -29,9 +29,9 @@ class InteractiveQuestionnaire:
         json_string = json_string.strip()
 
         # Basic validation: must start with [ and end with ]
-        if not (json_string.startswith('[') and json_string.endswith(']')):
+        if not (json_string.startswith("[") and json_string.endswith("]")):
             # Try to extract JSON array from response
-            match = re.search(r'\[.*\]', json_string, re.DOTALL)
+            match = re.search(r"\[.*\]", json_string, re.DOTALL)
             if not match:
                 return None
             json_string = match.group(0)
@@ -53,11 +53,13 @@ class InteractiveQuestionnaire:
                 if not isinstance(item, dict):
                     return None
                 # Basic required fields validation
-                if 'id' not in item or 'text' not in item:
+                if "id" not in item or "text" not in item:
                     return None
                 # Sanitize string values
                 for _key, value in item.items():
-                    if isinstance(value, str) and len(value) > 1000:  # Limit string length
+                    if (
+                        isinstance(value, str) and len(value) > 1000
+                    ):  # Limit string length
                         return None
 
             return parsed_data
@@ -315,12 +317,18 @@ class InteractiveQuestionnaire:
             # Validate string length limits
             if isinstance(value, str):
                 if len(value) > 10000:  # 10KB limit per field
-                    validation_errors[key] = f"Field '{key}' exceeds maximum length (10,000 characters)"
+                    validation_errors[key] = (
+                        f"Field '{key}' exceeds maximum length (10,000 characters)"
+                    )
                 # Sanitize potential dangerous characters
-                if any(char in value for char in ['\x00', '\x08', '\x0b', '\x0c']):
-                    validation_errors[key] = f"Field '{key}' contains invalid control characters"
+                if any(char in value for char in ["\x00", "\x08", "\x0b", "\x0c"]):
+                    validation_errors[key] = (
+                        f"Field '{key}' contains invalid control characters"
+                    )
             elif value is not None and not isinstance(value, str | int | float | bool):
-                validation_errors[key] = f"Field '{key}' must be a string, number, boolean, or None"
+                validation_errors[key] = (
+                    f"Field '{key}' must be a string, number, boolean, or None"
+                )
 
         return validation_errors
 
@@ -330,7 +338,9 @@ class InteractiveQuestionnaire:
             return ""
         if isinstance(value, str):
             # Remove control characters and limit length
-            sanitized = ''.join(char for char in value if ord(char) >= 32 or char in ['\n', '\t'])
+            sanitized = "".join(
+                char for char in value if ord(char) >= 32 or char in ["\n", "\t"]
+            )
             return sanitized[:10000]  # Limit to 10KB
         if isinstance(value, int | float | bool):
             return str(value)
@@ -349,26 +359,73 @@ class InteractiveQuestionnaire:
                 items.append(cleaned)
         return items[:50]  # Limit to 50 items max
 
+    def _generate_intelligent_app_name(self, app_type: str) -> str:
+        """Generate contextually appropriate app name based on type and purpose."""
+        app_type = app_type.lower()
+        purpose = self._sanitize_string_value(
+            self.collected_data.get("primary_purpose", "")
+        ).lower()
+
+        # Type-specific intelligent defaults
+        if "cli" in app_type or "command" in app_type:
+            if "tool" in purpose or "utility" in purpose:
+                return "utility-cli"
+            elif "process" in purpose or "manage" in purpose:
+                return "process-manager"
+            return "command-line-tool"
+        elif "api" in app_type or "service" in app_type:
+            if "data" in purpose or "database" in purpose:
+                return "data-service"
+            elif "auth" in purpose or "user" in purpose:
+                return "auth-service"
+            return "api-service"
+        elif "mobile" in app_type:
+            if "social" in purpose or "chat" in purpose:
+                return "social-mobile-app"
+            elif "productivity" in purpose or "task" in purpose:
+                return "productivity-app"
+            return "mobile-application"
+        else:  # Web application or default
+            if "dashboard" in purpose or "admin" in purpose:
+                return "admin-dashboard"
+            elif "shop" in purpose or "ecommerce" in purpose:
+                return "web-store"
+            elif "blog" in purpose or "content" in purpose:
+                return "content-platform"
+            return "web-application"
+
     def _create_app_design(self) -> AppDesign:
         """Convert collected data into AppDesign model with validation."""
 
         # Validate collected data first
         validation_errors = self._validate_collected_data()
         if validation_errors:
-            error_msg = "\n".join([f"- {field}: {error}" for field, error in validation_errors.items()])
+            error_msg = "\n".join(
+                [f"- {field}: {error}" for field, error in validation_errors.items()]
+            )
             self.console.print(f"[red]Data validation errors:\n{error_msg}[/red]")
-            self.console.print("[yellow]Using default values for invalid fields...[/yellow]")
+            self.console.print(
+                "[yellow]Using default values for invalid fields...[/yellow]"
+            )
 
-        # Extract and sanitize basic information
-        name = self._sanitize_string_value(self.collected_data.get("app_name", "My Application"))
-        if not name.strip():
-            name = "My Application"
-
-        app_type_raw = self._sanitize_string_value(self.collected_data.get("app_type", "Web Application"))
+        # Extract and sanitize basic information with intelligent defaults
+        app_type_raw = self._sanitize_string_value(
+            self.collected_data.get("app_type", "Web Application")
+        )
         app_type = app_type_raw.lower() if app_type_raw else "web application"
 
-        description = self._sanitize_string_value(self.collected_data.get("primary_purpose", ""))
-        target_audience = self._sanitize_string_value(self.collected_data.get("target_audience"))
+        name = self._sanitize_string_value(
+            self.collected_data.get("app_name", self._generate_intelligent_app_name(app_type))
+        )
+        if not name.strip():
+            name = self._generate_intelligent_app_name(app_type)
+
+        description = self._sanitize_string_value(
+            self.collected_data.get("primary_purpose", "")
+        )
+        target_audience = self._sanitize_string_value(
+            self.collected_data.get("target_audience")
+        )
 
         # Extract features and goals from various fields with validation
         primary_features = []
@@ -395,8 +452,10 @@ class InteractiveQuestionnaire:
 
         # Validate required fields
         if not name.strip():
-            self.console.print("[yellow]Warning: Application name is empty, using default[/yellow]")
-            name = "My Application"
+            self.console.print(
+                "[yellow]Warning: Application name is empty, using intelligent default[/yellow]"
+            )
+            name = self._generate_intelligent_app_name(app_type)
 
         try:
             return AppDesign(
@@ -412,10 +471,12 @@ class InteractiveQuestionnaire:
             )
         except Exception as e:
             self.console.print(f"[red]Error creating AppDesign: {e}[/red]")
-            self.console.print("[yellow]Using minimal default configuration...[/yellow]")
+            self.console.print(
+                "[yellow]Using minimal default configuration...[/yellow]"
+            )
             # Return minimal valid AppDesign as fallback
             return AppDesign(
-                name="My Application",
+                name="web-application",
                 type="web application",
                 description="A software application",
                 primary_features=[],
