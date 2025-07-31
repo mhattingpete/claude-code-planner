@@ -367,3 +367,458 @@ class TestInteractiveQuestionnaire:
         assert app_design.additional_info == questionnaire.collected_data
         assert app_design.additional_info["custom_field"] == "custom_value"
         assert app_design.additional_info["another_field"] == "another_value"
+
+    def test_safe_json_parse_empty_input(self, questionnaire):
+        """Test _safe_json_parse with empty/invalid input."""
+        # Test None input
+        assert questionnaire._safe_json_parse(None) is None
+
+        # Test empty string
+        assert questionnaire._safe_json_parse("") is None
+
+        # Test non-string input
+        assert questionnaire._safe_json_parse(123) is None
+
+    def test_safe_json_parse_invalid_json_structure(self, questionnaire):
+        """Test _safe_json_parse with invalid JSON structure."""
+        # Test missing brackets
+        assert questionnaire._safe_json_parse('{"id": "test"}') is None
+
+        # Test no JSON array found
+        assert questionnaire._safe_json_parse("not json at all") is None
+
+        # Test oversized input
+        large_input = "[" + "x" * 50001 + "]"
+        assert questionnaire._safe_json_parse(large_input) is None
+
+    def test_safe_json_parse_valid_extraction(self, questionnaire):
+        """Test _safe_json_parse extracting JSON from response text."""
+        # Test extracting JSON array from text
+        response_text = 'Here is the JSON: [{"id": "test", "text": "Test question"}] Hope this helps!'
+        result = questionnaire._safe_json_parse(response_text)
+        assert result is not None
+        assert len(result) == 1
+        assert result[0]["id"] == "test"
+
+    def test_safe_json_parse_invalid_structure_validation(self, questionnaire):
+        """Test _safe_json_parse structure validation."""
+        # Test non-list JSON
+        assert questionnaire._safe_json_parse('{"not": "a list"}') is None
+
+        # Test list with non-dict items
+        assert questionnaire._safe_json_parse('["not", "dicts"]') is None
+
+        # Test dict missing required fields
+        assert questionnaire._safe_json_parse('[{"missing": "id_and_text"}]') is None
+
+        # Test oversized string values
+        large_value = "x" * 1001
+        assert (
+            questionnaire._safe_json_parse(
+                f'[{{"id": "test", "text": "{large_value}"}}]'
+            )
+            is None
+        )
+
+    def test_safe_json_parse_json_decode_error(self, questionnaire):
+        """Test _safe_json_parse with JSON decode errors."""
+        # Test malformed JSON
+        assert questionnaire._safe_json_parse('[{"id": "test", "incomplete":}]') is None
+
+        # Test invalid JSON syntax
+        assert (
+            questionnaire._safe_json_parse('[{id: "test", "text": "missing quotes"}]')
+            is None
+        )
+
+    @patch("claude_code_designer.questionnaire.query")
+    async def test_generate_questions_general_exception(
+        self, mock_query, questionnaire
+    ):
+        """Test _generate_questions with general exception."""
+        # Mock general exception
+        mock_query.side_effect = ValueError("Test error")
+
+        questions = await questionnaire._generate_questions()
+
+        # Should return default questions
+        assert len(questions) == 4
+        assert questions[0].id == "app_type"
+
+    def test_display_welcome(self, questionnaire):
+        """Test _display_welcome method."""
+        # This tests the display method execution
+        questionnaire._display_welcome()
+        # If no exception is raised, the test passes
+
+    @patch("claude_code_designer.questionnaire.query")
+    async def test_generate_follow_up_questions_keyboard_interrupt(
+        self, mock_query, questionnaire
+    ):
+        """Test keyboard interrupt in follow-up question generation."""
+        parent_question = Question(
+            id="parent",
+            text="Parent question",
+            type="multiple_choice",
+            follow_up={"Yes": "follow_up_yes"},
+        )
+
+        mock_query.side_effect = KeyboardInterrupt()
+
+        with pytest.raises(KeyboardInterrupt):
+            await questionnaire._generate_follow_up_questions(parent_question, "Yes")
+
+    @patch("claude_code_designer.questionnaire.query")
+    async def test_generate_follow_up_questions_connection_error(
+        self, mock_query, questionnaire
+    ):
+        """Test connection error in follow-up question generation."""
+        parent_question = Question(
+            id="parent",
+            text="Parent question",
+            type="multiple_choice",
+            follow_up={"Yes": "follow_up_yes"},
+        )
+
+        mock_query.side_effect = ConnectionError("Network error")
+
+        questions = await questionnaire._generate_follow_up_questions(
+            parent_question, "Yes"
+        )
+
+        assert questions == []
+
+    @patch("claude_code_designer.questionnaire.query")
+    async def test_generate_follow_up_questions_general_exception(
+        self, mock_query, questionnaire
+    ):
+        """Test general exception in follow-up question generation."""
+        parent_question = Question(
+            id="parent",
+            text="Parent question",
+            type="multiple_choice",
+            follow_up={"Yes": "follow_up_yes"},
+        )
+
+        mock_query.side_effect = ValueError("Test error")
+
+        questions = await questionnaire._generate_follow_up_questions(
+            parent_question, "Yes"
+        )
+
+        assert questions == []
+
+    @patch("claude_code_designer.questionnaire.IntPrompt.ask")
+    def test_handle_multiple_choice_keyboard_interrupt(
+        self, mock_prompt, questionnaire
+    ):
+        """Test keyboard interrupt in multiple choice handling."""
+        question = Question(
+            id="test",
+            text="Choose option",
+            type="multiple_choice",
+            options=["Option 1", "Option 2"],
+        )
+        mock_prompt.side_effect = KeyboardInterrupt()
+
+        with pytest.raises(KeyboardInterrupt):
+            questionnaire._handle_multiple_choice(question)
+
+    @patch("claude_code_designer.questionnaire.IntPrompt.ask")
+    def test_handle_multiple_choice_general_exception(self, mock_prompt, questionnaire):
+        """Test general exception in multiple choice handling."""
+        question = Question(
+            id="test",
+            text="Choose option",
+            type="multiple_choice",
+            options=["Option 1", "Option 2"],
+        )
+        # First general exception, then valid choice
+        mock_prompt.side_effect = [ValueError("Test error"), 1]
+
+        result = questionnaire._handle_multiple_choice(question)
+
+        assert result == "Option 1"
+        assert mock_prompt.call_count == 2
+
+    async def test_process_question_unknown_type(self, questionnaire):
+        """Test _process_question with unknown question type."""
+        question = Question(
+            id="test",
+            text="Unknown type question",
+            type="unknown_type",
+        )
+
+        with patch("claude_code_designer.questionnaire.Prompt.ask") as mock_prompt:
+            mock_prompt.return_value = "default answer"
+            result = await questionnaire._process_question(question)
+
+        assert result == "default answer"
+        mock_prompt.assert_called_once_with("Answer", default="")
+
+    def test_validate_collected_data_invalid_type(self, questionnaire):
+        """Test _validate_collected_data with invalid data type."""
+        questionnaire.collected_data = "not a dict"
+
+        errors = questionnaire._validate_collected_data()
+
+        assert "collected_data" in errors
+        assert "must be a dictionary" in errors["collected_data"]
+
+    def test_validate_collected_data_non_string_keys(self, questionnaire):
+        """Test _validate_collected_data with non-string keys."""
+        questionnaire.collected_data = {123: "value", "valid_key": "value"}
+
+        errors = questionnaire._validate_collected_data()
+
+        assert "123" in errors
+        assert "must be strings" in errors["123"]
+
+    def test_validate_collected_data_oversized_string(self, questionnaire):
+        """Test _validate_collected_data with oversized string."""
+        large_string = "x" * 10001
+        questionnaire.collected_data = {"large_field": large_string}
+
+        errors = questionnaire._validate_collected_data()
+
+        assert "large_field" in errors
+        assert "exceeds maximum length" in errors["large_field"]
+
+    def test_validate_collected_data_control_characters(self, questionnaire):
+        """Test _validate_collected_data with control characters."""
+        invalid_string = "test\x00string"
+        questionnaire.collected_data = {"invalid_field": invalid_string}
+
+        errors = questionnaire._validate_collected_data()
+
+        assert "invalid_field" in errors
+        assert "invalid control characters" in errors["invalid_field"]
+
+    def test_validate_collected_data_invalid_value_types(self, questionnaire):
+        """Test _validate_collected_data with invalid value types."""
+        questionnaire.collected_data = {
+            "list_field": ["not", "allowed"],
+            "dict_field": {"not": "allowed"},
+        }
+
+        errors = questionnaire._validate_collected_data()
+
+        assert "list_field" in errors
+        assert "dict_field" in errors
+
+    def test_sanitize_string_value_various_types(self, questionnaire):
+        """Test _sanitize_string_value with various input types."""
+        # Test None
+        assert questionnaire._sanitize_string_value(None) == ""
+
+        # Test string with control characters
+        dirty_string = "test\x08string\x00with\x0ccontrol"
+        clean = questionnaire._sanitize_string_value(dirty_string)
+        assert "\x08" not in clean
+        assert "\x00" not in clean
+        assert "\x0c" not in clean
+        assert "teststring" in clean
+
+        # Test numeric types
+        assert questionnaire._sanitize_string_value(123) == "123"
+        assert questionnaire._sanitize_string_value(45.67) == "45.67"
+        assert questionnaire._sanitize_string_value(True) == "True"
+
+        # Test oversized string
+        large_string = "x" * 15000
+        result = questionnaire._sanitize_string_value(large_string)
+        assert len(result) == 10000
+
+        # Test other types
+        assert questionnaire._sanitize_string_value([1, 2, 3]) == "[1, 2, 3]"
+
+    def test_split_and_clean_list_various_inputs(self, questionnaire):
+        """Test _split_and_clean_list with various inputs."""
+        # Test empty string
+        assert questionnaire._split_and_clean_list("") == []
+
+        # Test normal comma-separated values
+        result = questionnaire._split_and_clean_list("one, two, three")
+        assert result == ["one", "two", "three"]
+
+        # Test with oversized items (should be filtered out)
+        oversized_item = "x" * 1001
+        result = questionnaire._split_and_clean_list(
+            f"valid,{oversized_item},also_valid"
+        )
+        assert result == ["valid", "also_valid"]
+
+        # Test with too many items (should be limited to 50)
+        many_items = ",".join([f"item{i}" for i in range(100)])
+        result = questionnaire._split_and_clean_list(many_items)
+        assert len(result) == 50
+
+    def test_create_app_design_with_validation_errors(self, questionnaire):
+        """Test _create_app_design with validation errors."""
+        # Set invalid data that will trigger validation errors
+        questionnaire.collected_data = {
+            123: "invalid key",  # Non-string key
+            "oversized": "x" * 10001,  # Oversized value
+        }
+
+        app_design = questionnaire._create_app_design()
+
+        # Should still create a valid AppDesign with defaults
+        assert app_design.name == "My Application"
+        assert app_design.type == "web application"
+
+    def test_create_app_design_empty_name_fallback(self, questionnaire):
+        """Test _create_app_design with empty name fallback."""
+        questionnaire.collected_data = {"app_name": "   "}  # Empty/whitespace name
+
+        app_design = questionnaire._create_app_design()
+
+        assert app_design.name == "My Application"
+
+    def test_create_app_design_feature_extraction(self, questionnaire):
+        """Test _create_app_design feature extraction from various fields."""
+        questionnaire.collected_data = {
+            "app_name": "Feature App",
+            "app_type": "Web Application",
+            "primary_purpose": "Testing",
+            "key_features": "Auth, API, Dashboard",
+            "main_goals": "MVP, Scale, Launch",
+            "tech_stack_details": "Python, React, PostgreSQL",
+            "project_constraints": "Budget: $10k, Time: 6 months",
+        }
+
+        app_design = questionnaire._create_app_design()
+
+        assert "Auth" in app_design.primary_features
+        assert "API" in app_design.primary_features
+        assert "MVP" in app_design.goals
+        assert "Scale" in app_design.goals
+        assert "Python" in app_design.tech_stack
+        assert "React" in app_design.tech_stack
+        assert "Budget: $10k" in app_design.constraints
+
+    def test_safe_json_parse_non_list_structure(self, questionnaire):
+        """Test _safe_json_parse with non-list JSON structure (line 49)."""
+        # Test valid JSON but not an array
+        result = questionnaire._safe_json_parse('{"valid": "json", "but": "not array"}')
+        assert result is None
+
+    def test_create_app_design_empty_name_warning(self, questionnaire):
+        """Test _create_app_design with empty name warning (lines 398-399)."""
+        questionnaire.collected_data = {"app_name": ""}  # Empty name
+
+        app_design = questionnaire._create_app_design()
+
+        # Should use default name
+        assert app_design.name == "My Application"
+
+    @patch("claude_code_designer.questionnaire.query")
+    async def test_generate_questions_message_without_content(
+        self, mock_query, questionnaire
+    ):
+        """Test _generate_questions with message without content attribute (line 137)."""
+
+        # Mock Claude SDK response with message object without content attribute
+        async def mock_query_response():
+            mock_message = Mock()
+            # Remove content attribute to trigger line 137
+            del mock_message.content
+            yield mock_message
+
+        mock_query.return_value = mock_query_response()
+
+        questions = await questionnaire._generate_questions()
+
+        # Should return default questions due to invalid JSON
+        assert len(questions) == 4
+        assert questions[0].id == "app_type"
+
+    @patch("claude_code_designer.questionnaire.query")
+    async def test_generate_follow_up_questions_message_without_content(
+        self, mock_query, questionnaire
+    ):
+        """Test _generate_follow_up_questions with message without content attribute (line 278)."""
+        parent_question = Question(
+            id="parent",
+            text="Parent question",
+            type="multiple_choice",
+            follow_up={"Yes": "follow_up_yes"},
+        )
+
+        # Mock Claude SDK response with message object without content attribute
+        async def mock_query_response():
+            mock_message = Mock()
+            # Remove content attribute to trigger line 278
+            del mock_message.content
+            yield mock_message
+
+        mock_query.return_value = mock_query_response()
+
+        questions = await questionnaire._generate_follow_up_questions(
+            parent_question, "Yes"
+        )
+
+        # Should return empty list due to invalid JSON
+        assert questions == []
+
+    @patch("claude_code_designer.questionnaire.query")
+    async def test_run_questionnaire_end_to_end_with_follow_up(
+        self, mock_query, questionnaire
+    ):
+        """Test complete run_questionnaire flow with follow-up questions."""
+        # Mock initial questions
+        initial_questions_json = json.dumps(
+            [
+                {
+                    "id": "app_type",
+                    "text": "What type of application?",
+                    "type": "multiple_choice",
+                    "options": ["Web App", "CLI Tool"],
+                    "required": True,
+                    "follow_up": {"Web App": "web_followup"},
+                }
+            ]
+        )
+
+        # Mock follow-up questions
+        followup_questions_json = json.dumps(
+            [
+                {
+                    "id": "web_framework",
+                    "text": "Which web framework?",
+                    "type": "text",
+                    "options": None,
+                    "required": False,
+                    "follow_up": None,
+                }
+            ]
+        )
+
+        call_count = [0]
+
+        async def mock_query_response(*args, **kwargs):
+            call_count[0] += 1
+            mock_message = Mock()
+            if call_count[0] == 1:
+                mock_message.content = initial_questions_json
+            else:
+                mock_message.content = followup_questions_json
+            yield mock_message
+
+        mock_query.side_effect = mock_query_response
+
+        # Mock user inputs
+        with (
+            patch(
+                "claude_code_designer.questionnaire.IntPrompt.ask"
+            ) as mock_int_prompt,
+            patch("claude_code_designer.questionnaire.Prompt.ask") as mock_text_prompt,
+        ):
+            mock_int_prompt.return_value = 1  # Select "Web App"
+            mock_text_prompt.return_value = "Django"
+
+            app_design = await questionnaire.run_questionnaire()
+
+            assert app_design.name == "My Application"  # Default since no app_name
+            assert questionnaire.collected_data["app_type"] == "Web App"
+            assert questionnaire.collected_data["web_framework"] == "Django"
