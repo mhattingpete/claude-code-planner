@@ -653,6 +653,32 @@ class TestInteractiveQuestionnaire:
         result = questionnaire._split_and_clean_list(many_items)
         assert len(result) == 50
 
+    def test_split_and_clean_list_edge_cases(self, questionnaire):
+        """Test _split_and_clean_list with edge cases containing commas."""
+        # Test quoted values with commas
+        result = questionnaire._split_and_clean_list('"item, with comma", regular, "another, with comma"')
+        assert result == ["item, with comma", "regular", "another, with comma"]
+
+        # Test single quoted value with comma
+        result = questionnaire._split_and_clean_list('"single item, with comma"')
+        assert result == ["single item, with comma"]
+
+        # Test mixed quoted and unquoted
+        result = questionnaire._split_and_clean_list('unquoted, "quoted, item", another')
+        assert result == ["unquoted", "quoted, item", "another"]
+
+        # Test empty quoted strings
+        result = questionnaire._split_and_clean_list('"", valid, ""')
+        assert result == ["valid"]
+
+        # Test malformed quotes (CSV handles gracefully)
+        result = questionnaire._split_and_clean_list('item1, "unclosed quote, item2')
+        assert result == ["item1", "unclosed quote, item2"]
+
+        # Test whitespace handling with quotes (strips quoted content)
+        result = questionnaire._split_and_clean_list('  "  spaced item  "  ,  normal  ')
+        assert result == ["spaced item", "normal"]
+
     def test_create_app_design_with_validation_errors(self, questionnaire):
         """Test _create_app_design with validation errors."""
         # Set invalid data that will trigger validation errors

@@ -351,12 +351,32 @@ class InteractiveQuestionnaire:
         """Split string value and clean up the resulting list."""
         if not value:
             return []
-        # Split by comma and clean up items
+
+        import csv
+        import io
+
         items = []
-        for item in value.split(","):
-            cleaned = item.strip()
-            if cleaned and len(cleaned) <= 1000:  # Limit individual item length
-                items.append(cleaned)
+        try:
+            # Use CSV reader to handle quoted values and commas properly
+            csv_reader = csv.reader(io.StringIO(value.strip()), skipinitialspace=True)
+            for row in csv_reader:
+                for item in row:
+                    cleaned = item.strip()
+                    # Remove surrounding quotes if they exist (for fallback cases)
+                    if cleaned.startswith('"') and cleaned.endswith('"') and len(cleaned) > 1:
+                        cleaned = cleaned[1:-1]
+                    if cleaned and len(cleaned) <= 1000:  # Limit individual item length
+                        items.append(cleaned)
+        except csv.Error:
+            # Fallback to simple splitting if CSV parsing fails
+            for item in value.split(","):
+                cleaned = item.strip()
+                # Remove surrounding quotes if they exist
+                if cleaned.startswith('"') and cleaned.endswith('"') and len(cleaned) > 1:
+                    cleaned = cleaned[1:-1]
+                if cleaned and len(cleaned) <= 1000:  # Limit individual item length
+                    items.append(cleaned)
+
         return items[:50]  # Limit to 50 items max
 
     def _generate_intelligent_app_name(self, app_type: str) -> str:
