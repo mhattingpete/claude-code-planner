@@ -298,41 +298,130 @@ class InteractiveQuestionnaire:
         except Exception:
             return []
 
+    def _validate_collected_data(self) -> dict[str, str]:
+        """Validate and sanitize collected data."""
+        validation_errors = {}
+
+        if not isinstance(self.collected_data, dict):
+            validation_errors["collected_data"] = "Collected data must be a dictionary"
+            return validation_errors
+
+        # Validate each field
+        for key, value in self.collected_data.items():
+            if not isinstance(key, str):
+                validation_errors[str(key)] = "All keys must be strings"
+                continue
+
+            # Validate string length limits
+            if isinstance(value, str):
+                if len(value) > 10000:  # 10KB limit per field
+                    validation_errors[key] = f"Field '{key}' exceeds maximum length (10,000 characters)"
+                # Sanitize potential dangerous characters
+                if any(char in value for char in ['\x00', '\x08', '\x0b', '\x0c']):
+                    validation_errors[key] = f"Field '{key}' contains invalid control characters"
+            elif value is not None and not isinstance(value, str | int | float | bool):
+                validation_errors[key] = f"Field '{key}' must be a string, number, boolean, or None"
+
+        return validation_errors
+
+    def _sanitize_string_value(self, value: Any) -> str:
+        """Safely convert and sanitize a value to string."""
+        if value is None:
+            return ""
+        if isinstance(value, str):
+            # Remove control characters and limit length
+            sanitized = ''.join(char for char in value if ord(char) >= 32 or char in ['\n', '\t'])
+            return sanitized[:10000]  # Limit to 10KB
+        if isinstance(value, int | float | bool):
+            return str(value)
+        # For other types, convert safely
+        return str(value)[:10000]
+
+    def _split_and_clean_list(self, value: str) -> list[str]:
+        """Split string value and clean up the resulting list."""
+        if not value:
+            return []
+        # Split by comma and clean up items
+        items = []
+        for item in value.split(","):
+            cleaned = item.strip()
+            if cleaned and len(cleaned) <= 1000:  # Limit individual item length
+                items.append(cleaned)
+        return items[:50]  # Limit to 50 items max
+
     def _create_app_design(self) -> AppDesign:
-        """Convert collected data into AppDesign model."""
+        """Convert collected data into AppDesign model with validation."""
 
-        # Extract basic information
-        name = self.collected_data.get("app_name", "My Application")
-        app_type = self.collected_data.get("app_type", "Web Application").lower()
-        description = self.collected_data.get("primary_purpose", "")
-        target_audience = self.collected_data.get("target_audience")
+        # Validate collected data first
+        validation_errors = self._validate_collected_data()
+        if validation_errors:
+            error_msg = "\n".join([f"- {field}: {error}" for field, error in validation_errors.items()])
+            self.console.print(f"[red]Data validation errors:\n{error_msg}[/red]")
+            self.console.print("[yellow]Using default values for invalid fields...[/yellow]")
 
-        # Extract features and goals from various fields
+        # Extract and sanitize basic information
+        name = self._sanitize_string_value(self.collected_data.get("app_name", "My Application"))
+        if not name.strip():
+            name = "My Application"
+
+        app_type_raw = self._sanitize_string_value(self.collected_data.get("app_type", "Web Application"))
+        app_type = app_type_raw.lower() if app_type_raw else "web application"
+
+        description = self._sanitize_string_value(self.collected_data.get("primary_purpose", ""))
+        target_audience = self._sanitize_string_value(self.collected_data.get("target_audience"))
+
+        # Extract features and goals from various fields with validation
         primary_features = []
         goals = []
         tech_stack = []
         constraints = []
 
-        # Process all collected data
+        # Process all collected data safely
         for key, value in self.collected_data.items():
-            if value and isinstance(value, str):
-                if "feature" in key.lower():
-                    primary_features.extend([f.strip() for f in value.split(",")])
-                elif "goal" in key.lower() or "objective" in key.lower():
-                    goals.extend([g.strip() for g in value.split(",")])
-                elif "tech" in key.lower() or "stack" in key.lower():
-                    tech_stack.extend([t.strip() for t in value.split(",")])
-                elif "constraint" in key.lower() or "limitation" in key.lower():
-                    constraints.extend([c.strip() for c in value.split(",")])
+            if not isinstance(key, str):
+                continue
 
-        return AppDesign(
-            name=name,
-            type=app_type,
-            description=description,
-            primary_features=primary_features,
-            tech_stack=tech_stack,
-            target_audience=target_audience,
-            goals=goals,
-            constraints=constraints,
-            additional_info=self.collected_data,
-        )
+            sanitized_value = self._sanitize_string_value(value)
+            if sanitized_value:
+                key_lower = key.lower()
+                if "feature" in key_lower:
+                    primary_features.extend(self._split_and_clean_list(sanitized_value))
+                elif "goal" in key_lower or "objective" in key_lower:
+                    goals.extend(self._split_and_clean_list(sanitized_value))
+                elif "tech" in key_lower or "stack" in key_lower:
+                    tech_stack.extend(self._split_and_clean_list(sanitized_value))
+                elif "constraint" in key_lower or "limitation" in key_lower:
+                    constraints.extend(self._split_and_clean_list(sanitized_value))
+
+        # Validate required fields
+        if not name.strip():
+            self.console.print("[yellow]Warning: Application name is empty, using default[/yellow]")
+            name = "My Application"
+
+        try:
+            return AppDesign(
+                name=name,
+                type=app_type,
+                description=description,
+                primary_features=primary_features,
+                tech_stack=tech_stack,
+                target_audience=target_audience if target_audience else None,
+                goals=goals,
+                constraints=constraints,
+                additional_info=self.collected_data,
+            )
+        except Exception as e:
+            self.console.print(f"[red]Error creating AppDesign: {e}[/red]")
+            self.console.print("[yellow]Using minimal default configuration...[/yellow]")
+            # Return minimal valid AppDesign as fallback
+            return AppDesign(
+                name="My Application",
+                type="web application",
+                description="A software application",
+                primary_features=[],
+                tech_stack=[],
+                target_audience=None,
+                goals=[],
+                constraints=[],
+                additional_info={},
+            )
