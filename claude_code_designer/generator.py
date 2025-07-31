@@ -19,28 +19,43 @@ class DocumentGenerator:
         Returns:
             Dictionary mapping document names to their file paths
         """
-        output_dir = Path(request.output_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            output_dir = Path(request.output_dir)
+            output_dir.mkdir(parents=True, exist_ok=True)
+        except PermissionError as e:
+            raise Exception(
+                f"Permission denied: Cannot create output directory {request.output_dir}"
+            ) from e
+        except OSError as e:
+            raise Exception(f"Cannot create output directory {request.output_dir}: {e}") from e
 
         generated_files = {}
 
-        if request.generate_prd:
-            prd_content = await self._generate_prd(request.app_design)
-            prd_path = output_dir / "PRD.md"
-            prd_path.write_text(prd_content, encoding="utf-8")
-            generated_files["PRD"] = str(prd_path)
+        try:
+            if request.generate_prd:
+                prd_content = await self._generate_prd(request.app_design)
+                prd_path = output_dir / "PRD.md"
+                prd_path.write_text(prd_content, encoding="utf-8")
+                generated_files["PRD"] = str(prd_path)
 
-        if request.generate_claude_md:
-            claude_md_content = await self._generate_claude_md(request.app_design)
-            claude_md_path = output_dir / "CLAUDE.md"
-            claude_md_path.write_text(claude_md_content, encoding="utf-8")
-            generated_files["CLAUDE.md"] = str(claude_md_path)
+            if request.generate_claude_md:
+                claude_md_content = await self._generate_claude_md(request.app_design)
+                claude_md_path = output_dir / "CLAUDE.md"
+                claude_md_path.write_text(claude_md_content, encoding="utf-8")
+                generated_files["CLAUDE.md"] = str(claude_md_path)
 
-        if request.generate_readme:
-            readme_content = await self._generate_readme(request.app_design)
-            readme_path = output_dir / "README.md"
-            readme_path.write_text(readme_content, encoding="utf-8")
-            generated_files["README"] = str(readme_path)
+            if request.generate_readme:
+                readme_content = await self._generate_readme(request.app_design)
+                readme_path = output_dir / "README.md"
+                readme_path.write_text(readme_content, encoding="utf-8")
+                generated_files["README"] = str(readme_path)
+
+        except KeyboardInterrupt:
+            raise
+        except PermissionError as e:
+            raise Exception(f"Permission denied writing files to {output_dir}: {e}") from e
+        except OSError as e:
+            raise Exception(f"Error writing files to {output_dir}: {e}") from e
 
         return generated_files
 
@@ -77,8 +92,10 @@ Keep it concise but comprehensive. Focus on essential requirements without over-
                     content += message.content
         except KeyboardInterrupt:
             raise
+        except ConnectionError:
+            content = f"# PRD for {design.name}\n\n## Executive Summary\n\n{design.description}\n\n*Note: Full PRD generation failed due to connection error. Please regenerate when connection is restored.*"
         except Exception as e:
-            content = f"# PRD for {design.name}\n\nError generating content: {str(e)}"
+            content = f"# PRD for {design.name}\n\n## Executive Summary\n\n{design.description}\n\n*Note: PRD generation encountered an error: {str(e)}*"
 
         return content
 
@@ -114,10 +131,10 @@ Focus on:
                     content += message.content
         except KeyboardInterrupt:
             raise
+        except ConnectionError:
+            content = f"# CLAUDE.md - {design.name}\n\n## Project Overview\n\n{design.description}\n\n*Note: Full CLAUDE.md generation failed due to connection error. Please regenerate when connection is restored.*"
         except Exception as e:
-            content = (
-                f"# CLAUDE.md - {design.name}\n\nError generating content: {str(e)}"
-            )
+            content = f"# CLAUDE.md - {design.name}\n\n## Project Overview\n\n{design.description}\n\n*Note: CLAUDE.md generation encountered an error: {str(e)}*"
 
         return content
 
@@ -150,7 +167,9 @@ Keep it simple and focused on user needs. Avoid unnecessary technical complexity
                     content += message.content
         except KeyboardInterrupt:
             raise
+        except ConnectionError:
+            content = f"# {design.name}\n\n{design.description}\n\n## Features\n\n{', '.join([f'- {f}' for f in design.primary_features]) if design.primary_features else '- Core functionality'}\n\n*Note: Full README generation failed due to connection error. Please regenerate when connection is restored.*"
         except Exception as e:
-            content = f"# {design.name}\n\nError generating content: {str(e)}"
+            content = f"# {design.name}\n\n{design.description}\n\n*Note: README generation encountered an error: {str(e)}*"
 
         return content

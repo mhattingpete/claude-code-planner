@@ -93,9 +93,25 @@ class InteractiveQuestionnaire:
             questions_data = json.loads(questions_json.strip())
             return [Question(**q) for q in questions_data]
 
+        except KeyboardInterrupt:
+            self.console.print(
+                "\n[yellow]Question generation interrupted by user[/yellow]"
+            )
+            raise
+        except json.JSONDecodeError:
+            self.console.print(
+                "[yellow]Invalid JSON response from Claude. Using default questions.[/yellow]"
+            )
+            return self._get_default_questions()
+        except ConnectionError:
+            self.console.print(
+                "[yellow]Network connection error. Using default questions.[/yellow]"
+            )
+            return self._get_default_questions()
         except Exception as e:
-            self.console.print(f"[red]Error generating questions: {e}[/red]")
-            # Fallback to default questions
+            self.console.print(
+                f"[yellow]Error generating questions: {e}. Using default questions.[/yellow]"
+            )
             return self._get_default_questions()
 
     def _get_default_questions(self) -> list[Question]:
@@ -214,8 +230,19 @@ class InteractiveQuestionnaire:
             questions_data = json.loads(questions_json.strip())
             return [Question(**q) for q in questions_data]
 
+        except KeyboardInterrupt:
+            raise
+        except json.JSONDecodeError:
+            self.console.print(
+                "[dim]Unable to generate follow-up questions due to invalid response[/dim]"
+            )
+            return []
+        except ConnectionError:
+            self.console.print(
+                "[dim]Unable to generate follow-up questions due to connection error[/dim]"
+            )
+            return []
         except Exception:
-            # No follow-up questions on error
             return []
 
     def _create_app_design(self) -> AppDesign:

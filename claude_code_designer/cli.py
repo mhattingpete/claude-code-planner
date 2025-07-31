@@ -63,34 +63,46 @@ async def _run_design_process(
     skip_readme: bool,
 ) -> None:
     """Run the complete design process."""
-    # Initialize questionnaire and run it
-    questionnaire = InteractiveQuestionnaire()
-    app_design = await questionnaire.run_questionnaire()
+    try:
+        # Initialize questionnaire and run it
+        questionnaire = InteractiveQuestionnaire()
+        app_design = await questionnaire.run_questionnaire()
 
-    # Display design summary
-    _display_design_summary(app_design)
+        # Display design summary
+        _display_design_summary(app_design)
 
-    # Confirm generation
-    if not click.confirm("\nGenerate project documents?", default=False):
-        console.print("[yellow]Document generation cancelled[/yellow]")
-        return
+        # Confirm generation
+        if not click.confirm("\nGenerate project documents?", default=False):
+            console.print("[yellow]Document generation cancelled[/yellow]")
+            return
 
-    # Create document request
-    doc_request = DocumentRequest(
-        output_dir=str(output_dir.resolve()),
-        generate_prd=not skip_prd,
-        generate_claude_md=not skip_claude_md,
-        generate_readme=not skip_readme,
-        app_design=app_design,
-    )
+        # Create document request
+        doc_request = DocumentRequest(
+            output_dir=str(output_dir.resolve()),
+            generate_prd=not skip_prd,
+            generate_claude_md=not skip_claude_md,
+            generate_readme=not skip_readme,
+            app_design=app_design,
+        )
 
-    # Generate documents
-    console.print("\n[blue]Generating documents...[/blue]")
-    generator = DocumentGenerator()
-    generated_files = await generator.generate_documents(doc_request)
+        # Generate documents
+        console.print("\n[blue]Generating documents...[/blue]")
+        generator = DocumentGenerator()
+        generated_files = await generator.generate_documents(doc_request)
 
-    # Display results
-    _display_generation_results(generated_files, output_dir)
+        # Display results
+        _display_generation_results(generated_files, output_dir)
+
+    except KeyboardInterrupt:
+        raise
+    except ConnectionError:
+        console.print(
+            "\n[red]Network connection error. Please check your internet connection and try again.[/red]"
+        )
+        raise click.Abort() from None
+    except Exception as e:
+        console.print(f"\n[red]Unexpected error: {e}[/red]")
+        raise click.Abort() from e
 
 
 def _display_design_summary(app_design) -> None:
