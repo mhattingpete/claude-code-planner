@@ -77,7 +77,7 @@ class InteractiveQuestionnaire:
 
         # Process each question
         for question in questions:
-            answer = await self._process_question(question)
+            answer = self._process_question(question)
             self.collected_data[question.id] = answer
 
             # Generate follow-up questions if needed
@@ -86,7 +86,7 @@ class InteractiveQuestionnaire:
                     question, answer
                 )
                 for fq in follow_up_questions:
-                    follow_up_answer = await self._process_question(fq)
+                    follow_up_answer = self._process_question(fq)
                     self.collected_data[fq.id] = follow_up_answer
 
         # Convert collected data to AppDesign
@@ -196,7 +196,7 @@ class InteractiveQuestionnaire:
             ),
         ]
 
-    async def _process_question(self, question: Question) -> str:
+    def _process_question(self, question: Question) -> str:
         """Process a single question and get user input."""
 
         # Display question
@@ -376,7 +376,6 @@ class InteractiveQuestionnaire:
                     cleaned = cleaned[1:-1]
                 if cleaned and len(cleaned) <= 1000:  # Limit individual item length
                     items.append(cleaned)
-
         return items[:50]  # Limit to 50 items max
 
     def _generate_intelligent_app_name(self, app_type: str) -> str:
@@ -416,7 +415,7 @@ class InteractiveQuestionnaire:
 
     def _create_app_design(self) -> AppDesign:
         """Convert collected data into AppDesign model with validation."""
-
+        
         # Validate collected data first
         validation_errors = self._validate_collected_data()
         if validation_errors:
