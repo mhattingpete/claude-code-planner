@@ -51,11 +51,11 @@ class DocumentGenerator:
 Application Name: {design.name}
 Type: {design.type}
 Description: {design.description}
-Primary Features: {', '.join(design.primary_features)}
-Tech Stack: {', '.join(design.tech_stack)}
-Target Audience: {design.target_audience or 'Not specified'}
-Goals: {', '.join(design.goals)}
-Constraints: {', '.join(design.constraints)}
+Primary Features: {", ".join(design.primary_features)}
+Tech Stack: {", ".join(design.tech_stack)}
+Target Audience: {design.target_audience or "Not specified"}
+Goals: {", ".join(design.goals)}
+Constraints: {", ".join(design.constraints)}
 
 Create a comprehensive PRD following this structure:
 1. Executive Summary
@@ -73,7 +73,7 @@ Keep it concise but comprehensive. Focus on essential requirements without over-
         content = ""
         try:
             async for message in query(prompt=prompt):
-                if hasattr(message, 'content'):
+                if hasattr(message, "content"):
                     content += message.content
         except KeyboardInterrupt:
             raise
@@ -88,8 +88,8 @@ Keep it concise but comprehensive. Focus on essential requirements without over-
 
 Application Name: {design.name}
 Type: {design.type}
-Tech Stack: {', '.join(design.tech_stack)}
-Primary Features: {', '.join(design.primary_features)}
+Tech Stack: {", ".join(design.tech_stack)}
+Primary Features: {", ".join(design.primary_features)}
 
 Create technical guidelines following this structure:
 1. Project Overview
@@ -110,12 +110,14 @@ Focus on:
         content = ""
         try:
             async for message in query(prompt=prompt):
-                if hasattr(message, 'content'):
+                if hasattr(message, "content"):
                     content += message.content
         except KeyboardInterrupt:
             raise
         except Exception as e:
-            content = f"# CLAUDE.md - {design.name}\n\nError generating content: {str(e)}"
+            content = (
+                f"# CLAUDE.md - {design.name}\n\nError generating content: {str(e)}"
+            )
 
         return content
 
@@ -126,9 +128,9 @@ Focus on:
 Application Name: {design.name}
 Type: {design.type}
 Description: {design.description}
-Primary Features: {', '.join(design.primary_features)}
-Tech Stack: {', '.join(design.tech_stack)}
-Target Audience: {design.target_audience or 'General users'}
+Primary Features: {", ".join(design.primary_features)}
+Tech Stack: {", ".join(design.tech_stack)}
+Target Audience: {design.target_audience or "General users"}
 
 Create a clear, user-focused README with:
 1. Project title and brief description
@@ -144,7 +146,7 @@ Keep it simple and focused on user needs. Avoid unnecessary technical complexity
         content = ""
         try:
             async for message in query(prompt=prompt):
-                if hasattr(message, 'content'):
+                if hasattr(message, "content"):
                     content += message.content
         except KeyboardInterrupt:
             raise
