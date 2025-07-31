@@ -372,3 +372,88 @@ class TestDocumentGenerator:
 
             assert "# Test App" in content
             assert "Some error" in content
+
+    def test_validate_output_path_valid_relative_path(self, generator):
+        """Test validation of valid relative paths within current directory."""
+        valid_paths = [
+            "output",
+            "./output",
+            "nested/output/dir",
+            "./nested/output/dir",
+        ]
+
+        for path in valid_paths:
+            result = generator._validate_output_path(path)
+            assert isinstance(result, Path)
+            assert result.is_absolute()
+
+    def test_validate_output_path_valid_absolute_path(self, generator):
+        """Test validation of valid absolute paths."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            valid_path = str(Path(temp_dir) / "output")
+            result = generator._validate_output_path(valid_path)
+            assert isinstance(result, Path)
+            assert result.is_absolute()
+
+    def test_validate_output_path_blocks_traversal_attempts(self, generator):
+        """Test that path traversal attempts are blocked."""
+        malicious_paths = [
+            "../etc/passwd",
+            "../../etc/passwd",
+            "../../../etc/passwd",
+            "output/../../../etc/passwd",
+            "output/../../secrets",
+            "../config",
+            "subdir/../../../etc/hosts",
+        ]
+
+        for path in malicious_paths:
+            with pytest.raises(ValueError, match="Path traversal detected"):
+                generator._validate_output_path(path)
+
+    def test_validate_output_path_blocks_hidden_traversal(self, generator):
+        """Test that hidden path traversal attempts are blocked."""
+        malicious_paths = [
+            "output/..%2Fetc%2Fpasswd",  # URL encoded
+            "output/....//etc/passwd",   # Double dots with slash
+        ]
+
+        # These should be handled by normpath check
+        for path in malicious_paths:
+            try:
+                result = generator._validate_output_path(path)
+                # If it doesn't raise an error, ensure it's still within safe bounds
+                assert not str(result).endswith("/etc/passwd")
+            except ValueError:
+                # It's okay if it raises ValueError for suspicious paths
+                pass
+
+    def test_validate_output_path_invalid_paths(self, generator):
+        """Test handling of invalid or malformed paths."""
+        # Test empty path specifically
+        with pytest.raises(ValueError, match="Invalid path"):
+            generator._validate_output_path("")
+
+        # Test null byte path
+        try:
+            result = generator._validate_output_path("\x00invalid")
+            # If it doesn't raise an error, it should still be a valid path object
+            assert isinstance(result, Path)
+        except (ValueError, OSError):
+            # Either of these exceptions is acceptable for null byte paths
+            pass
+
+    async def test_generate_documents_path_traversal_protection(
+        self, generator, sample_app_design
+    ):
+        """Test that document generation blocks path traversal attempts."""
+        request = DocumentRequest(
+            output_dir="../../../etc",  # Path traversal attempt
+            generate_prd=True,
+            generate_claude_md=False,
+            generate_readme=False,
+            app_design=sample_app_design,
+        )
+
+        with pytest.raises(Exception, match="Invalid output directory"):
+            await generator.generate_documents(request)

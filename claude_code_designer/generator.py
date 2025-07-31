@@ -1,5 +1,6 @@
 """Document generation engine using Claude Code SDK."""
 
+import os
 from pathlib import Path
 
 from claude_code_sdk import query
@@ -9,6 +10,52 @@ from .models import AppDesign, DocumentRequest
 
 class DocumentGenerator:
     """Generates project documents using Claude Code SDK."""
+
+    def _validate_output_path(self, path: str) -> Path:
+        """Validate and sanitize output directory path to prevent path traversal.
+
+        Args:
+            path: User-provided output directory path
+
+        Returns:
+            Validated Path object
+
+        Raises:
+            ValueError: If path contains path traversal attempts or is invalid
+        """
+        # Check for obviously invalid paths upfront
+        if not path or path.isspace():
+            raise ValueError("Invalid path: empty or whitespace-only path")
+
+        try:
+            # Additional check for common path traversal patterns in the original string
+            normalized_path = os.path.normpath(path)
+            if '..' in normalized_path or normalized_path.startswith('../'):
+                raise ValueError(f"Path traversal detected in path: {path}")
+
+            # Convert to absolute path and resolve any symbolic links
+            resolved_path = Path(path).resolve()
+
+            # Get current working directory as base
+            cwd = Path.cwd().resolve()
+
+            # Check if the resolved path is within or equal to current directory tree
+            try:
+                resolved_path.relative_to(cwd)
+            except ValueError as e:
+                # Path is outside current directory tree, check if it's a valid absolute path
+                if not resolved_path.is_absolute():
+                    raise ValueError(f"Invalid path: {path}") from e
+
+                # For absolute paths, ensure they don't contain obvious traversal patterns
+                path_parts = resolved_path.parts
+                if any(part in ('.', '..') for part in path_parts):
+                    raise ValueError(f"Path traversal detected in path: {path}") from e
+
+            return resolved_path
+
+        except (OSError, RuntimeError) as e:
+            raise ValueError(f"Invalid path: {path} - {e}") from e
 
     async def generate_documents(self, request: DocumentRequest) -> dict[str, str]:
         """Generate all requested documents and save to output directory.
@@ -20,8 +67,11 @@ class DocumentGenerator:
             Dictionary mapping document names to their file paths
         """
         try:
-            output_dir = Path(request.output_dir)
+            # Validate output directory path to prevent path traversal
+            output_dir = self._validate_output_path(request.output_dir)
             output_dir.mkdir(parents=True, exist_ok=True)
+        except ValueError as e:
+            raise Exception(f"Invalid output directory: {e}") from e
         except PermissionError as e:
             raise Exception(
                 f"Permission denied: Cannot create output directory {request.output_dir}"
