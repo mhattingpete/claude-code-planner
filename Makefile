@@ -47,3 +47,9 @@ test:
 coverage:
 	@echo "Generating coverage report"
 	uv run pytest --cov=src --cov-report term-missing
+
+.PHONY: publish
+publish:
+	@echo "Publishing package to PyPI"
+	uv build
+	uv publish
