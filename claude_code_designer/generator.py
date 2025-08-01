@@ -87,19 +87,19 @@ class DocumentGenerator:
         try:
             if request.generate_prd:
                 prd_content = await self._generate_prd(request.app_design)
-                prd_path = output_dir / DOCUMENT_TYPES["PRD"]
+                prd_path = output_dir / f"messages_{DOCUMENT_TYPES['PRD']}"
                 prd_path.write_text(prd_content, encoding=DEFAULT_ENCODING)
                 generated_files["PRD"] = str(prd_path)
 
             if request.generate_claude_md:
                 claude_md_content = await self._generate_claude_md(request.app_design)
-                claude_md_path = output_dir / DOCUMENT_TYPES["CLAUDE_MD"]
+                claude_md_path = output_dir / f"messages_{DOCUMENT_TYPES['CLAUDE_MD']}"
                 claude_md_path.write_text(claude_md_content, encoding=DEFAULT_ENCODING)
                 generated_files["CLAUDE.md"] = str(claude_md_path)
 
             if request.generate_readme:
                 readme_content = await self._generate_readme(request.app_design)
-                readme_path = output_dir / DOCUMENT_TYPES["README"]
+                readme_path = output_dir / f"messages_{DOCUMENT_TYPES['README']}"
                 readme_path.write_text(readme_content, encoding=DEFAULT_ENCODING)
                 generated_files["README"] = str(readme_path)
 
@@ -133,16 +133,53 @@ class DocumentGenerator:
 
     async def _generate_prd(self, design: AppDesign) -> str:
         """Generate PRD.md content based on app design."""
+        # Ensure string fields are strings and list fields are lists
+        name = str(design.name) if design.name else "Application"
+        app_type = str(design.type) if design.type else ""
+        description = str(design.description) if design.description else ""
+        target_audience = (
+            str(design.target_audience) if design.target_audience else "Not specified"
+        )
+
+        primary_features = (
+            design.primary_features
+            if isinstance(design.primary_features, list)
+            else [design.primary_features]
+            if design.primary_features
+            else []
+        )
+        tech_stack = (
+            design.tech_stack
+            if isinstance(design.tech_stack, list)
+            else [design.tech_stack]
+            if design.tech_stack
+            else []
+        )
+        goals = (
+            design.goals
+            if isinstance(design.goals, list)
+            else [design.goals]
+            if design.goals
+            else []
+        )
+        constraints = (
+            design.constraints
+            if isinstance(design.constraints, list)
+            else [design.constraints]
+            if design.constraints
+            else []
+        )
+
         prompt = f"""Generate a Product Requirements Document (PRD) for the following application:
 
-Application Name: {design.name}
-Type: {design.type}
-Description: {design.description}
-Primary Features: {", ".join(design.primary_features)}
-Tech Stack: {", ".join(design.tech_stack)}
-Target Audience: {design.target_audience or "Not specified"}
-Goals: {", ".join(design.goals)}
-Constraints: {", ".join(design.constraints)}
+Application Name: {name}
+Type: {app_type}
+Description: {description}
+Primary Features: {", ".join(primary_features)}
+Tech Stack: {", ".join(tech_stack)}
+Target Audience: {target_audience}
+Goals: {", ".join(goals)}
+Constraints: {", ".join(constraints)}
 
 Create a comprehensive PRD following this structure:
 1. Executive Summary
@@ -162,21 +199,33 @@ Keep it concise but comprehensive. Focus on essential requirements without over-
             query_stream = query(prompt=prompt)
             try:
                 async for message in query_stream:
-                    if hasattr(message, "content"):
-                        content += message.content
+                    # Handle different message types from Claude Code SDK
+                    if hasattr(message, "content") and message.content:
+                        # Handle list of TextBlocks or similar
+                        if isinstance(message.content, list):
+                            for block in message.content:
+                                if hasattr(block, "text"):
+                                    content += str(block.text)
+                        else:
+                            content += str(message.content)
+                    elif hasattr(message, "text") and message.text:
+                        content += str(message.text)
+                    elif hasattr(message, "data") and isinstance(message.data, dict):
+                        # Skip system messages and other non-content messages
+                        continue
             finally:
                 if hasattr(query_stream, "aclose"):
                     await query_stream.aclose()
         except KeyboardInterrupt:
             raise
         except ConnectionError:
-            content = f"# PRD for {design.name}\n\n## Executive Summary\n\n{design.description}\n\n*Note: Full PRD generation failed due to connection error. Please regenerate when connection is restored.*"
+            content = f"# PRD for {name}\n\n## Executive Summary\n\n{description}\n\n*Note: Full PRD generation failed due to connection error. Please regenerate when connection is restored.*"
         except (PermissionError, OSError) as e:
             troubleshooting = ERROR_MESSAGES["default"]
-            content = f"# PRD for {design.name}\n\n## Executive Summary\n\n{design.description}\n\n*Note: PRD generation failed due to a system error. {troubleshooting} Error details: {str(e)}*"
+            content = f"# PRD for {name}\n\n## Executive Summary\n\n{description}\n\n*Note: PRD generation failed due to a system error. {troubleshooting} Error details: {str(e)}*"
         except (ValueError, TypeError) as e:
             troubleshooting = ERROR_MESSAGES["default"]
-            content = f"# PRD for {design.name}\n\n## Executive Summary\n\n{design.description}\n\n*Note: PRD generation failed due to invalid data. {troubleshooting} Error details: {str(e)}*"
+            content = f"# PRD for {name}\n\n## Executive Summary\n\n{description}\n\n*Note: PRD generation failed due to invalid data. {troubleshooting} Error details: {str(e)}*"
         except Exception as e:
             error_msg = str(e).lower()
             if "authentication" in error_msg or "unauthorized" in error_msg:
@@ -188,18 +237,38 @@ Keep it concise but comprehensive. Focus on essential requirements without over-
             else:
                 troubleshooting = ERROR_MESSAGES["default"]
 
-            content = f"# PRD for {design.name}\n\n## Executive Summary\n\n{design.description}\n\n*Note: PRD generation failed due to an API error. {troubleshooting} Error details: {str(e)}*"
+            content = f"# PRD for {name}\n\n## Executive Summary\n\n{description}\n\n*Note: PRD generation failed due to an API error. {troubleshooting} Error details: {str(e)}*"
 
         return content
 
     async def _generate_claude_md(self, design: AppDesign) -> str:
         """Generate CLAUDE.md technical guidelines."""
+        # Ensure string fields are strings and list fields are lists
+        name = str(design.name) if design.name else "Application"
+        description = str(design.description) if design.description else ""
+        app_type = str(design.type) if design.type else ""
+
+        tech_stack = (
+            design.tech_stack
+            if isinstance(design.tech_stack, list)
+            else [design.tech_stack]
+            if design.tech_stack
+            else []
+        )
+        primary_features = (
+            design.primary_features
+            if isinstance(design.primary_features, list)
+            else [design.primary_features]
+            if design.primary_features
+            else []
+        )
+
         prompt = f"""Generate a CLAUDE.md technical guidelines document for this application:
 
-Application Name: {design.name}
-Type: {design.type}
-Tech Stack: {", ".join(design.tech_stack)}
-Primary Features: {", ".join(design.primary_features)}
+Application Name: {name}
+Type: {app_type}
+Tech Stack: {", ".join(tech_stack)}
+Primary Features: {", ".join(primary_features)}
 
 Create technical guidelines following this structure:
 1. Project Overview
@@ -222,21 +291,33 @@ Focus on:
             query_stream = query(prompt=prompt)
             try:
                 async for message in query_stream:
-                    if hasattr(message, "content"):
-                        content += message.content
+                    # Handle different message types from Claude Code SDK
+                    if hasattr(message, "content") and message.content:
+                        # Handle list of TextBlocks or similar
+                        if isinstance(message.content, list):
+                            for block in message.content:
+                                if hasattr(block, "text"):
+                                    content += str(block.text)
+                        else:
+                            content += str(message.content)
+                    elif hasattr(message, "text") and message.text:
+                        content += str(message.text)
+                    elif hasattr(message, "data") and isinstance(message.data, dict):
+                        # Skip system messages and other non-content messages
+                        continue
             finally:
                 if hasattr(query_stream, "aclose"):
                     await query_stream.aclose()
         except KeyboardInterrupt:
             raise
         except ConnectionError:
-            content = f"# CLAUDE.md - {design.name}\n\n## Project Overview\n\n{design.description}\n\n*Note: Full CLAUDE.md generation failed due to connection error. Please regenerate when connection is restored.*"
+            content = f"# CLAUDE.md - {name}\n\n## Project Overview\n\n{description}\n\n*Note: Full CLAUDE.md generation failed due to connection error. Please regenerate when connection is restored.*"
         except (PermissionError, OSError) as e:
             troubleshooting = ERROR_MESSAGES["default"]
-            content = f"# CLAUDE.md - {design.name}\n\n## Project Overview\n\n{design.description}\n\n*Note: CLAUDE.md generation failed due to a system error. {troubleshooting} Error details: {str(e)}*"
+            content = f"# CLAUDE.md - {name}\n\n## Project Overview\n\n{description}\n\n*Note: CLAUDE.md generation failed due to a system error. {troubleshooting} Error details: {str(e)}*"
         except (ValueError, TypeError) as e:
             troubleshooting = ERROR_MESSAGES["default"]
-            content = f"# CLAUDE.md - {design.name}\n\n## Project Overview\n\n{design.description}\n\n*Note: CLAUDE.md generation failed due to invalid data. {troubleshooting} Error details: {str(e)}*"
+            content = f"# CLAUDE.md - {name}\n\n## Project Overview\n\n{description}\n\n*Note: CLAUDE.md generation failed due to invalid data. {troubleshooting} Error details: {str(e)}*"
         except Exception as e:
             error_msg = str(e).lower()
             if "authentication" in error_msg or "unauthorized" in error_msg:
@@ -248,20 +329,43 @@ Focus on:
             else:
                 troubleshooting = ERROR_MESSAGES["default"]
 
-            content = f"# CLAUDE.md - {design.name}\n\n## Project Overview\n\n{design.description}\n\n*Note: CLAUDE.md generation failed due to an API error. {troubleshooting} Error details: {str(e)}*"
+            content = f"# CLAUDE.md - {name}\n\n## Project Overview\n\n{description}\n\n*Note: CLAUDE.md generation failed due to an API error. {troubleshooting} Error details: {str(e)}*"
 
         return content
 
     async def _generate_readme(self, design: AppDesign) -> str:
         """Generate README.md user documentation."""
+        # Ensure string fields are strings and list fields are lists
+        name = str(design.name) if design.name else "Application"
+        app_type = str(design.type) if design.type else ""
+        description = str(design.description) if design.description else ""
+        target_audience = (
+            str(design.target_audience) if design.target_audience else "General users"
+        )
+
+        tech_stack = (
+            design.tech_stack
+            if isinstance(design.tech_stack, list)
+            else [design.tech_stack]
+            if design.tech_stack
+            else []
+        )
+        primary_features = (
+            design.primary_features
+            if isinstance(design.primary_features, list)
+            else [design.primary_features]
+            if design.primary_features
+            else []
+        )
+
         prompt = f"""Generate a README.md file for this application:
 
-Application Name: {design.name}
-Type: {design.type}
-Description: {design.description}
-Primary Features: {", ".join(design.primary_features)}
-Tech Stack: {", ".join(design.tech_stack)}
-Target Audience: {design.target_audience or "General users"}
+Application Name: {name}
+Type: {app_type}
+Description: {description}
+Primary Features: {", ".join(primary_features)}
+Tech Stack: {", ".join(tech_stack)}
+Target Audience: {target_audience}
 
 Create a clear, user-focused README with:
 1. Project title and brief description
@@ -279,8 +383,20 @@ Keep it simple and focused on user needs. Avoid unnecessary technical complexity
             query_stream = query(prompt=prompt)
             try:
                 async for message in query_stream:
-                    if hasattr(message, "content"):
-                        content += message.content
+                    # Handle different message types from Claude Code SDK
+                    if hasattr(message, "content") and message.content:
+                        # Handle list of TextBlocks or similar
+                        if isinstance(message.content, list):
+                            for block in message.content:
+                                if hasattr(block, "text"):
+                                    content += str(block.text)
+                        else:
+                            content += str(message.content)
+                    elif hasattr(message, "text") and message.text:
+                        content += str(message.text)
+                    elif hasattr(message, "data") and isinstance(message.data, dict):
+                        # Skip system messages and other non-content messages
+                        continue
             finally:
                 if hasattr(query_stream, "aclose"):
                     await query_stream.aclose()
@@ -288,27 +404,27 @@ Keep it simple and focused on user needs. Avoid unnecessary technical complexity
             raise
         except ConnectionError:
             features = (
-                "\n".join([f"- {f}" for f in design.primary_features])
-                if design.primary_features
+                "\n".join([f"- {f}" for f in primary_features])
+                if primary_features
                 else "- Core functionality"
             )
-            content = f"# {design.name}\n\n{design.description}\n\n## Features\n\n{features}\n\n*Note: Full README generation failed due to connection error. Please regenerate when connection is restored.*"
+            content = f"# {name}\n\n{description}\n\n## Features\n\n{features}\n\n*Note: Full README generation failed due to connection error. Please regenerate when connection is restored.*"
         except (PermissionError, OSError) as e:
             troubleshooting = ERROR_MESSAGES["default"]
             features = (
-                "\n".join([f"- {f}" for f in design.primary_features])
-                if design.primary_features
+                "\n".join([f"- {f}" for f in primary_features])
+                if primary_features
                 else "- Core functionality"
             )
-            content = f"# {design.name}\n\n{design.description}\n\n## Features\n\n{features}\n\n*Note: README generation failed due to a system error. {troubleshooting} Error details: {str(e)}*"
+            content = f"# {name}\n\n{description}\n\n## Features\n\n{features}\n\n*Note: README generation failed due to a system error. {troubleshooting} Error details: {str(e)}*"
         except (ValueError, TypeError) as e:
             troubleshooting = ERROR_MESSAGES["default"]
             features = (
-                "\n".join([f"- {f}" for f in design.primary_features])
-                if design.primary_features
+                "\n".join([f"- {f}" for f in primary_features])
+                if primary_features
                 else "- Core functionality"
             )
-            content = f"# {design.name}\n\n{design.description}\n\n## Features\n\n{features}\n\n*Note: README generation failed due to invalid data. {troubleshooting} Error details: {str(e)}*"
+            content = f"# {name}\n\n{description}\n\n## Features\n\n{features}\n\n*Note: README generation failed due to invalid data. {troubleshooting} Error details: {str(e)}*"
         except Exception as e:
             error_msg = str(e).lower()
             if "authentication" in error_msg or "unauthorized" in error_msg:
@@ -321,10 +437,10 @@ Keep it simple and focused on user needs. Avoid unnecessary technical complexity
                 troubleshooting = ERROR_MESSAGES["default"]
 
             features = (
-                "\n".join([f"- {f}" for f in design.primary_features])
-                if design.primary_features
+                "\n".join([f"- {f}" for f in primary_features])
+                if primary_features
                 else "- Core functionality"
             )
-            content = f"# {design.name}\n\n{design.description}\n\n## Features\n\n{features}\n\n*Note: README generation failed due to an API error. {troubleshooting} Error details: {str(e)}*"
+            content = f"# {name}\n\n{description}\n\n## Features\n\n{features}\n\n*Note: README generation failed due to an API error. {troubleshooting} Error details: {str(e)}*"
 
         return content
