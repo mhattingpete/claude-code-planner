@@ -41,6 +41,16 @@ class InteractiveQuestionnaire:
         # Remove potential harmful content and validate basic structure
         json_string = json_string.strip()
 
+        # Handle code blocks - remove markdown json markers
+        if json_string.startswith("```json"):
+            json_string = json_string[7:]  # Remove ```json
+        if json_string.startswith("```"):
+            json_string = json_string[3:]   # Remove ```
+        if json_string.endswith("```"):
+            json_string = json_string[:-3]  # Remove closing ```
+
+        json_string = json_string.strip()
+
         # Basic validation: must start with [ and end with ]
         if not (json_string.startswith("[") and json_string.endswith("]")):
             # Try to extract JSON array from response
@@ -144,10 +154,20 @@ class InteractiveQuestionnaire:
             query_stream = query(prompt=prompt)
             try:
                 async for message in query_stream:
-                    if hasattr(message, "content"):
-                        questions_json += message.content
-                    else:
-                        questions_json += str(message)
+                    # Handle different message types from Claude Code SDK
+                    if hasattr(message, "content") and message.content:
+                        # Handle list of TextBlocks or similar
+                        if isinstance(message.content, list):
+                            for block in message.content:
+                                if hasattr(block, "text"):
+                                    questions_json += str(block.text)
+                        else:
+                            questions_json += str(message.content)
+                    elif hasattr(message, "text") and message.text:
+                        questions_json += str(message.text)
+                    elif hasattr(message, "data") and isinstance(message.data, dict):
+                        # Skip system messages and other non-content messages
+                        continue
             finally:
                 if hasattr(query_stream, "aclose"):
                     await query_stream.aclose()
@@ -294,10 +314,20 @@ class InteractiveQuestionnaire:
             query_stream = query(prompt=prompt)
             try:
                 async for message in query_stream:
-                    if hasattr(message, "content"):
-                        questions_json += message.content
-                    else:
-                        questions_json += str(message)
+                    # Handle different message types from Claude Code SDK
+                    if hasattr(message, "content") and message.content:
+                        # Handle list of TextBlocks or similar
+                        if isinstance(message.content, list):
+                            for block in message.content:
+                                if hasattr(block, "text"):
+                                    questions_json += str(block.text)
+                        else:
+                            questions_json += str(message.content)
+                    elif hasattr(message, "text") and message.text:
+                        questions_json += str(message.text)
+                    elif hasattr(message, "data") and isinstance(message.data, dict):
+                        # Skip system messages and other non-content messages
+                        continue
             finally:
                 if hasattr(query_stream, "aclose"):
                     await query_stream.aclose()

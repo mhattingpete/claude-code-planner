@@ -29,7 +29,7 @@ ERROR_MESSAGES = {
     "authentication": "Please run 'claude auth login' to authenticate with Claude Code CLI.",
     "rate_limit": "Rate limit exceeded. Please wait a few minutes before trying again.",
     "timeout": "Check your internet connection and try again. If the problem persists, Claude services may be temporarily unavailable.",
-    "default": "Check your Claude Code CLI installation with 'claude --version' and ensure you're authenticated with 'claude auth status'.",
+    "default": "Check your Claude Code CLI installation with 'claude --version' and ensure you're authenticated.",
 }
 
 # File encoding
