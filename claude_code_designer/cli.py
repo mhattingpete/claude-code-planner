@@ -1,4 +1,10 @@
-"""Click-based CLI interface for Claude Code Designer."""
+#!/usr/bin/env python3
+"""
+Claude Code Design Assistant
+
+Interactive CLI tool for designing applications and features using Claude Code SDK.
+Saves conversation history and supports both CLI and programmatic usage.
+"""
 
 import asyncio
 from pathlib import Path
@@ -6,176 +12,302 @@ from pathlib import Path
 import click
 from rich.console import Console
 from rich.panel import Panel
-from rich.table import Table
 
-from .constants import DEFAULT_OUTPUT_DIR, PANEL_STYLES
-from .generator import DocumentGenerator
-from .models import AppDesign, DocumentRequest
-from .questionnaire import InteractiveQuestionnaire
+from .conversation_evaluator import ConversationEvaluator
+from .design_assistant import DesignAssistant
+from .learning_system import LearningSystem
+from .simulator import DesignSimulator
 
 console = Console()
 
 
+
+
 @click.group()
-@click.version_option()
-def main() -> None:
-    """Claude Code Designer - Generate project documentation using Claude Code SDK."""
-    pass
-
-
-@main.command()
 @click.option(
-    "--output-dir",
-    default=DEFAULT_OUTPUT_DIR,
-    help="Output directory for generated documents",
-    type=click.Path(exists=False, file_okay=False, dir_okay=True, path_type=Path),
+    "--conversation-dir",
+    default="./conversations",
+    help="Directory to save conversations",
 )
-@click.option("--skip-prd", is_flag=True, help="Skip PRD.md generation")
-@click.option("--skip-claude-md", is_flag=True, help="Skip CLAUDE.md generation")
-@click.option("--skip-readme", is_flag=True, help="Skip README.md generation")
-def design(
-    output_dir: Path,
-    skip_prd: bool,
-    skip_claude_md: bool,
-    skip_readme: bool,
-) -> None:
-    """Start the interactive design process."""
-    try:
-        asyncio.run(
-            _run_design_process(
-                output_dir=output_dir,
-                skip_prd=skip_prd,
-                skip_claude_md=skip_claude_md,
-                skip_readme=skip_readme,
-            )
-        )
-    except KeyboardInterrupt:
-        console.print("\n[yellow]Design process interrupted by user[/yellow]")
-        raise click.Abort() from None
-    except Exception as e:
-        console.print(f"\n[red]Error during design process: {e}[/red]")
-        raise click.Abort() from e
+@click.pass_context
+def cli(ctx, conversation_dir):
+    """Claude Code Design Assistant - Help design applications and features."""
+    ctx.ensure_object(dict)
+    ctx.obj["assistant"] = DesignAssistant(conversation_dir)
 
 
-async def _run_design_process(
-    output_dir: Path,
-    skip_prd: bool,
-    skip_claude_md: bool,
-    skip_readme: bool,
-) -> None:
-    """Run the complete design process."""
-    try:
-        # Initialize questionnaire and run it
-        questionnaire = InteractiveQuestionnaire()
-        app_design = await questionnaire.run_questionnaire()
+@cli.command()
+@click.option("--name", help="Project name")
+@click.option(
+    "--type", "project_type", help="Project type (web, cli, api, mobile, etc.)"
+)
+@click.option("--description", "project_description", help="Project description")
+@click.option("--max-turns", default=15, help="Maximum conversation turns")
+@click.option("--non-interactive", is_flag=True, help="Run in non-interactive mode")
+@click.pass_context
+def app(ctx, name, project_type, project_description, max_turns, non_interactive):
+    """Design a new application."""
+    console.print(Panel.fit("🚀 Application Design Assistant", style="bold blue"))
 
-        # Display design summary
-        _display_design_summary(app_design)
+    assistant = ctx.obj["assistant"]
 
-        # Confirm generation
-        if not click.confirm("\nGenerate project documents?", default=False):
-            console.print("[yellow]Document generation cancelled[/yellow]")
-            return
-
-        # Create document request
-        doc_request = DocumentRequest(
-            output_dir=str(output_dir.resolve()),
-            generate_prd=not skip_prd,
-            generate_claude_md=not skip_claude_md,
-            generate_readme=not skip_readme,
-            app_design=app_design,
+    async def run_design():
+        return await assistant.design_application(
+            project_name=name,
+            project_type=project_type,
+            project_description=project_description,
+            interactive=not non_interactive,
+            max_turns=max_turns,
         )
 
-        # Generate documents
-        console.print("\n[blue]Generating documents...[/blue]")
-        generator = DocumentGenerator()
-        generated_files = await generator.generate_documents(doc_request)
-
-        # Display results
-        _display_generation_results(generated_files, output_dir)
-
-    except KeyboardInterrupt:
-        raise
-    except ConnectionError:
+    try:
+        conversation = asyncio.run(run_design())
         console.print(
-            "\n[red]Network connection error. Please check your internet connection and try again.[/red]"
+            f"✅ Design session completed with {conversation['output']['message_count']} messages"
         )
-        raise click.Abort() from None
-    except OSError as e:
-        console.print(f"\n[red]File system error: {e}[/red]")
-        raise click.Abort() from e
-    except ValueError as e:
-        console.print(f"\n[red]Configuration error: {e}[/red]")
-        raise click.Abort() from e
+    except KeyboardInterrupt:
+        console.print("\n❌ Design session interrupted by user")
     except Exception as e:
-        console.print(f"\n[red]Unexpected error: {e}[/red]")
-        raise click.Abort() from e
+        console.print(f"❌ Error: {e}")
 
 
-def _display_design_summary(app_design: AppDesign) -> None:
-    """Display summary of collected design information."""
-    summary_panel = Panel.fit(
-        f"[bold]Application:[/bold] {app_design.name}\n"
-        f"[bold]Type:[/bold] {app_design.type}\n"
-        f"[bold]Description:[/bold] {app_design.description}\n"
-        f"[bold]Features:[/bold] {', '.join(app_design.primary_features) or 'None specified'}\n"
-        f"[bold]Tech Stack:[/bold] {', '.join(app_design.tech_stack) or 'None specified'}",
-        title="Design Summary",
-        border_style=PANEL_STYLES["summary"],
-    )
-    console.print(summary_panel)
+@cli.command()
+@click.option("--description", help="Feature description")
+@click.option("--context", help="Project context")
+@click.option("--max-turns", default=10, help="Maximum conversation turns")
+@click.option("--non-interactive", is_flag=True, help="Run in non-interactive mode")
+@click.pass_context
+def feature(ctx, description, context, max_turns, non_interactive):
+    """Design a new feature for an existing project."""
+    console.print(Panel.fit("⚡ Feature Design Assistant", style="bold green"))
+
+    assistant = ctx.obj["assistant"]
+
+    async def run_design():
+        return await assistant.design_feature(
+            feature_description=description,
+            project_context=context,
+            interactive=not non_interactive,
+            max_turns=max_turns,
+        )
+
+    try:
+        conversation = asyncio.run(run_design())
+        console.print(
+            f"✅ Feature design completed with {conversation['output']['message_count']} messages"
+        )
+    except KeyboardInterrupt:
+        console.print("\n❌ Feature design interrupted by user")
+    except Exception as e:
+        console.print(f"❌ Error: {e}")
 
 
-def _display_generation_results(
-    generated_files: dict[str, str], output_dir: Path
-) -> None:
-    """Display the results of document generation."""
-    if not generated_files:
-        console.print("[yellow]No documents were generated[/yellow]")
+@cli.command()
+@click.argument("conversation_dir", default="./conversations")
+def list_conversations(conversation_dir):
+    """List saved conversations."""
+    conversations_path = Path(conversation_dir)
+    if not conversations_path.exists():
+        console.print(f"❌ Conversations directory not found: {conversation_dir}")
         return
 
-    # Success message
-    success_message = (
-        f"[green]✓ Successfully generated {len(generated_files)} documents![/green]"
+    json_files = list(conversations_path.glob("*.json"))
+    if not json_files:
+        console.print(f"📂 No conversations found in {conversation_dir}")
+        return
+
+    console.print(f"📋 Found {len(json_files)} conversations in {conversation_dir}:")
+    for file in sorted(json_files):
+        console.print(f"  • {file.name}")
+
+
+@cli.command()
+@click.option(
+    "--conversation-dir",
+    default="./conversations",
+    help="Directory with conversations to evaluate",
+)
+@click.option(
+    "--evaluation-dir", default="./evaluations", help="Directory to save evaluations"
+)
+@click.option("--conversation-file", help="Evaluate specific conversation file")
+def evaluate(conversation_dir, evaluation_dir, conversation_file):
+    """Evaluate conversation quality and agent performance."""
+    console.print(Panel.fit("📊 Conversation Evaluator", style="bold purple"))
+
+    evaluator = ConversationEvaluator(conversation_dir, evaluation_dir)
+
+    async def run_evaluation():
+        if conversation_file:
+            # Evaluate specific conversation
+            file_path = Path(conversation_dir) / conversation_file
+            if not file_path.exists():
+                console.print(f"❌ Conversation file not found: {file_path}")
+                return
+
+            evaluation = await evaluator.evaluate_conversation(file_path)
+
+            # Save evaluation
+            eval_file = Path(evaluation_dir) / f"{file_path.stem}_evaluation.json"
+            eval_file.parent.mkdir(exist_ok=True)
+            with open(eval_file, "w", encoding="utf-8") as f:
+                import json
+
+                json.dump(evaluation, f, indent=2, ensure_ascii=False)
+
+            console.print(f"✅ Evaluation completed: {eval_file.name}")
+        else:
+            # Evaluate all conversations
+            evaluations = await evaluator.evaluate_all_conversations()
+            if evaluations:
+                console.print(
+                    f"✅ Completed evaluation of {len(evaluations)} conversations"
+                )
+                console.print(f"📁 Results saved to: {evaluation_dir}")
+            else:
+                console.print("❌ No conversations found to evaluate")
+
+    try:
+        asyncio.run(run_evaluation())
+    except KeyboardInterrupt:
+        console.print("\n❌ Evaluation interrupted by user")
+    except Exception as e:
+        console.print(f"❌ Error: {e}")
+
+
+@cli.command()
+@click.option("--cycles", default=3, help="Number of simulation cycles to run")
+@click.option("--delay", default=2.0, help="Delay between cycles in seconds")
+@click.option(
+    "--type",
+    "scenario_type",
+    type=click.Choice(["app", "feature"]),
+    help="Type of scenarios to generate (app, feature, or mixed)"
+)
+@click.option(
+    "--conversation-dir", 
+    default="./simulation_conversations",
+    help="Directory for simulation conversations"
+)
+@click.option(
+    "--evaluation-dir",
+    default="./simulation_evaluations", 
+    help="Directory for simulation evaluations"
+)
+@click.option(
+    "--results-dir",
+    default="./simulation_results",
+    help="Directory for simulation results"
+)
+@click.option(
+    "--learning-dir",
+    default="./learning_knowledge",
+    help="Directory for learning knowledge base"
+)
+@click.option(
+    "--enable-learning/--disable-learning",
+    default=True,
+    help="Enable/disable learning from evaluations"
+)
+def simulate(cycles, delay, scenario_type, conversation_dir, evaluation_dir, results_dir, learning_dir, enable_learning):
+    """Run automated design simulation and evaluation cycles."""
+    console.print(Panel.fit("🔬 Design Assistant Simulator", style="bold cyan"))
+    
+    simulator = DesignSimulator(
+        conversation_dir, 
+        evaluation_dir, 
+        results_dir, 
+        learning_dir, 
+        enable_learning
     )
-    console.print(success_message)
-    console.print(f"[dim]Output directory: {output_dir.resolve()}[/dim]")
+    
+    async def run_simulation():
+        return await simulator.run_simulation_loop(
+            max_cycles=cycles,
+            delay_seconds=delay,
+            scenario_type=scenario_type
+        )
+    
+    try:
+        results = asyncio.run(run_simulation())
+        console.print(f"✅ Simulation completed with {len(results)} cycles")
+        console.print(f"📁 Results saved to: {results_dir}")
+    except KeyboardInterrupt:
+        console.print("\n❌ Simulation interrupted by user")
+    except Exception as e:
+        console.print(f"❌ Error: {e}")
 
-    # Table of generated files
-    table = Table(show_header=True, header_style="bold blue")
-    table.add_column("Document", style="cyan")
-    table.add_column("File Path", style="dim")
 
-    for doc_name, file_path in generated_files.items():
-        table.add_row(doc_name, file_path)
+@cli.command()
+@click.option(
+    "--knowledge-dir",
+    default="./learning_knowledge",
+    help="Directory containing learning knowledge base"
+)
+@click.option(
+    "--evaluation-dir",
+    default="./simulation_evaluations",
+    help="Directory containing evaluation files to learn from"
+)
+def learn(knowledge_dir, evaluation_dir):
+    """Manually trigger learning from existing evaluation files."""
+    console.print(Panel.fit("🧠 Learning System", style="bold magenta"))
+    
+    learning_system = LearningSystem(knowledge_dir, evaluation_dir)
+    
+    async def run_learning():
+        await learning_system.learn_from_evaluations()
+        stats = learning_system.get_knowledge_stats()
+        
+        console.print("📊 Learning completed!")
+        console.print(f"   Total rules: {stats.get('total_rules', 0)}")
+        console.print(f"   High confidence rules: {stats.get('confidence_distribution', {}).get('high', 0)}")
+        console.print(f"   Average confidence: {stats.get('avg_confidence', 0):.2f}")
+        
+        if stats.get('rule_types'):
+            console.print("   Rule types:")
+            for rule_type, count in stats['rule_types'].items():
+                console.print(f"     - {rule_type}: {count}")
+    
+    try:
+        asyncio.run(run_learning())
+    except KeyboardInterrupt:
+        console.print("\n❌ Learning interrupted by user")
+    except Exception as e:
+        console.print(f"❌ Error: {e}")
 
-    console.print(table)
 
-
-@main.command()
-def info() -> None:
-    """Display information about Claude Code Designer."""
-    info_panel = Panel.fit(
-        "[bold blue]Claude Code Designer[/bold blue]\n\n"
-        "Simple CLI for generating essential project documentation\n"
-        "using the Claude Code SDK.\n\n"
-        "[bold]Commands:[/bold]\n"
-        "  design    Start interactive design process\n"
-        "  info      Show this information\n\n"
-        "[bold]Options for design command:[/bold]\n"
-        "  --output-dir PATH     Output directory (default: current)\n"
-        "  --skip-prd           Skip PRD.md generation\n"
-        "  --skip-claude-md     Skip CLAUDE.md generation\n"
-        "  --skip-readme        Skip README.md generation\n\n"
-        "[bold]Examples:[/bold]\n"
-        "  claude-designer design\n"
-        "  claude-designer design --output-dir ./my-project\n"
-        "  claude-designer design --skip-prd --skip-readme",
-        title="Information",
-        border_style=PANEL_STYLES["info"],
-    )
-    console.print(info_panel)
+@cli.command()
+@click.option(
+    "--knowledge-dir",
+    default="./learning_knowledge",
+    help="Directory containing learning knowledge base"
+)
+def knowledge_stats(knowledge_dir):
+    """Show learning system knowledge base statistics."""
+    console.print(Panel.fit("📚 Knowledge Base Statistics", style="bold blue"))
+    
+    learning_system = LearningSystem(knowledge_dir)
+    stats = learning_system.get_knowledge_stats()
+    
+    if stats.get('total_rules', 0) == 0:
+        console.print("❌ No learning rules found. Run some simulations first!")
+        return
+    
+    console.print(f"📊 Total learning rules: {stats['total_rules']}")
+    console.print(f"📈 Average confidence: {stats.get('avg_confidence', 0):.2f}")
+    
+    console.print("\n🎯 Confidence distribution:")
+    confidence = stats.get('confidence_distribution', {})
+    console.print(f"   • High (≥0.8): {confidence.get('high', 0)}")
+    console.print(f"   • Medium (0.6-0.8): {confidence.get('medium', 0)}")
+    console.print(f"   • Low (<0.6): {confidence.get('low', 0)}")
+    
+    if stats.get('rule_types'):
+        console.print("\n📋 Rule types:")
+        for rule_type, count in stats['rule_types'].items():
+            console.print(f"   • {rule_type}: {count}")
 
 
 if __name__ == "__main__":
-    main()
+    cli()

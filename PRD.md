@@ -2,39 +2,40 @@
 
 ## 1. Executive Summary
 
-Claude Code Designer is a simple, minimal-maintenance CLI tool that leverages the Claude Code SDK to streamline application design through an intelligent questionnaire system. The tool generates essential project documentation with minimal complexity, focusing on clarity and ease of maintenance over feature richness.
+Claude Code Designer is a simple, minimal-maintenance CLI tool that leverages the Claude Code SDK with specialized subagents to provide interactive AI-powered design assistance for applications and features. The tool uses app-designer and conversation-evaluator subagents to provide expert domain knowledge through conversation-based interactions, with minimal complexity and ease of maintenance over feature richness.
 
 ## 2. Problem Statement
 
 **Current Challenge:**
-- Starting new software projects requires extensive planning and documentation
-- Creating comprehensive PRDs, technical specifications, and README files is time-consuming
-- Developers often skip or inadequately document project requirements and technical guidelines
-- Inconsistent documentation quality across projects
+- Starting new software projects requires extensive planning and architecture decisions
+- Developers need interactive guidance during application and feature design process
 - Lack of structured approach to application design and planning
+- Difficulty maintaining conversation history and design decisions
+- Need for AI-powered assistance that understands development workflows
 
 **Impact:**
-- Projects start without clear requirements or technical direction
-- Poor documentation leads to scope creep and technical debt
-- Team onboarding is slow due to inadequate project documentation
+- Projects start without clear architectural direction
+- Developers make suboptimal design decisions without expert guidance
+- Lost design knowledge when conversations and decisions aren't preserved
 - Inconsistent development practices across projects
 
 ## 3. Goals and Objectives
 
 ### Primary Goals
-- **Simplify Application Design Process**: Reduce time to create essential application specifications with minimal complexity
-- **Generate Maintainable Documentation**: Create clear, concise documentation that requires minimal ongoing maintenance
-- **Provide Simple Structure**: Offer straightforward approach to defining core requirements without over-engineering
+- **Provide Interactive Design Assistance**: Offer AI-powered guidance for application and feature design
+- **Simplify Architecture Decision Making**: Help developers make informed technical choices
+- **Preserve Design Knowledge**: Maintain conversation history and design decisions for future reference
 
 ### Secondary Goals
-- **Minimal Maintenance Overhead**: Ensure generated documentation requires little to no ongoing updates
-- **Simple Standardization**: Establish basic, consistent patterns that are easy to follow
-- **Focused AI Assistance**: Use Claude to generate only essential content, avoiding feature bloat
+- **Minimal Maintenance Overhead**: Ensure tool requires little to no ongoing updates
+- **Focused AI Assistance**: Use Claude to provide essential guidance, avoiding feature bloat
+- **Conversation Management**: Maintain history of design sessions for future reference
+- **Programmatic Access**: Enable integration with other development tools and workflows
 
 ### Success Metrics
-- Time to generate complete project documentation: < 15 minutes
-- Documentation completeness score: > 90% (compared to manual creation)
-- User adoption rate: 80% of target developers use tool for new projects
+- Time to get design guidance: < 5 minutes to start conversation
+- Design quality improvement: Better architectural decisions through AI guidance
+- User adoption rate: 80% of target developers use tool for design assistance
 - User satisfaction score: > 4.5/5.0
 
 ## 4. Target Audience
@@ -53,71 +54,72 @@ Claude Code Designer is a simple, minimal-maintenance CLI tool that leverages th
 
 ### Core User Stories
 
-**US-1: Application Design Questionnaire**
-```
-As a developer starting a new project,
-I want to answer a series of contextual questions about my application,
-So that I can define clear requirements and technical specifications.
-```
-
-**US-2: Document Generation**
-```
-As a project lead,
-I want to automatically generate PRD, CLAUDE.md, and README files,
-So that I have comprehensive project documentation without manual effort.
-```
-
-**US-3: Interactive CLI Experience**
+**US-1: Interactive CLI Experience**
 ```
 As a user,
 I want a rich, interactive terminal experience with clear prompts and options,
-So that the questionnaire process is engaging and easy to follow.
+So that the design process is engaging and easy to follow.
 ```
 
-**US-4: Adaptive Questioning**
+**US-2: Interactive Design Assistant**
 ```
-As a user answering questions,
-I want follow-up questions based on my previous answers,
-So that the tool captures relevant details for my specific use case.
+As a developer designing an application or feature,
+I want AI-powered interactive guidance and recommendations,
+So that I can make informed architectural and implementation decisions.
+```
+
+**US-3: Conversation History Management**
+```
+As a user working on multiple projects,
+I want to save and review past design conversations,
+So that I can reference previous decisions and learn from past projects.
+```
+
+**US-4: Programmatic Integration**
+```
+As a developer with existing workflows,
+I want to use the design assistant from my own Python scripts,
+So that I can integrate design guidance into my development tools.
 ```
 
 ## 6. Functional Requirements
 
-### FR-1: Questionnaire System
-- Generate 3-5 essential multiple-choice questions using Claude Code SDK
-- Minimal follow-up questions to avoid complexity
-- Collect core application details: type, primary features, and basic tech preferences
-- Simple validation with sensible defaults to reduce configuration overhead
-
-### FR-2: Document Generation
-- **PRD Generation**: Concise summary, core goals, essential requirements - avoiding over-specification
-- **CLAUDE.md Generation**: Simple development rules, basic commands, minimal maintenance workflows
-- **README Generation**: Clear installation steps, basic usage, minimal feature description - no unnecessary complexity
-
-### FR-3: CLI Interface
+### FR-1: CLI Interface
 - Simple, clean terminal interface with minimal visual complexity
-- Straightforward command structure: `claude-designer design [options]`
-- Basic options to customize output without feature bloat
-- Concise summary display with simple confirmation
+- Command structure: `uv run python -m claude_code_designer.cli [app|feature|list-conversations]`
+- Basic options to customize behavior without feature bloat
 - Essential error handling without over-engineering
 
-### FR-4: File Management
-- Save generated documents to specified output directory
-- Support custom output paths
-- Preserve existing files with user confirmation
-- Proper file encoding (UTF-8) and formatting
+### FR-2: Interactive Design Assistant
+- **App-Designer Subagent**: Specialized AI agent for application and feature design with expert knowledge
+- **Application Design Mode**: Guide users through architectural decisions for new applications
+- **Feature Design Mode**: Help design features for existing projects with codebase analysis
+- **Contextual Questioning**: Ask relevant follow-up questions based on project type and user responses
+- **Implementation Guidance**: Provide specific code structure and implementation recommendations
+
+### FR-3: Conversation Management
+- **Automatic Saving**: Save all design conversations with timestamps and metadata
+- **Conversation Listing**: List previous conversations with searchable filenames
+- **JSON Format**: Store conversations in structured JSON format for easy processing
+- **Conversation Directory**: Configurable directory for storing conversation history
+
+### FR-4: Programmatic API
+- **DesignAssistant Class**: Main class for programmatic access to design functionality
+- **Async Interface**: Full async/await support for integration with existing async applications
+- **Configuration Options**: Customizable system prompts, conversation turns, and tool permissions
+- **Return Structured Data**: Return conversation data in structured format for processing
 
 ## 7. Non-Functional Requirements
 
 ### Performance
-- Question generation: < 5 seconds per question set
-- Document generation: < 30 seconds for all three documents
-- Total process completion: < 10 minutes including user interaction
+- Conversation startup: < 5 seconds to begin design assistance
+- Response time: Interactive responses within reasonable API limits
+- Total session: Variable based on conversation complexity and user needs
 
 ### Reliability
 - 99% uptime dependency on Claude Code SDK availability
 - Graceful degradation when API is unavailable
-- Data persistence during process interruption
+- Conversation data persistence during process interruption
 
 ### Usability
 - Intuitive command structure following CLI best practices

@@ -6,7 +6,28 @@
 
 ## Project Overview
 
-Claude Code Designer is a simple Python CLI application that generates essential project documentation using the Claude Code SDK. The application prioritizes simplicity and minimal maintenance over complex features, following KISS principles with basic async patterns and straightforward architecture.
+Claude Code Designer is a simple Python CLI application that provides AI-powered interactive design assistance using the Claude Code SDK. The application prioritizes simplicity and minimal maintenance over complex features, following KISS principles with basic async patterns and straightforward architecture.
+
+## Error Prevention Rules
+**MANDATORY**: Whenever I make a mistake and correct it, I MUST immediately add a prevention rule below.
+
+When agent makes mistakes or user requests general coding changes, add rules here to prevent future occurrences:
+
+### Type Hints
+- ALWAYS use built-in types for type hints: `list`, `dict`, `tuple`, `set` instead of `List`, `Dict`, `Tuple`, `Set`
+- Use `Union` from typing only when necessary, prefer `X | Y` syntax for Python 3.10+
+
+### Testing
+- When updating implementation, ALWAYS update corresponding tests to match new interface
+- Run tests with `uv run python -m pytest` (NOT `uv run pytest` or `PYTHONPATH=.`)
+- Test file imports should match the actual module structure (`from src.module import Class`)
+- ALWAYS verify class/function names exist before importing by checking the actual module file with Grep tool
+- DO NOT assume class names - check `^class.*:` or `^def.*:` patterns in target files before writing imports
+
+### Merge Conflicts
+- When merging branches, always check if tests match the current implementation
+- Prefer our branch's architectural decisions (logging, naming conventions, import structure)
+- Update tests immediately after resolving conflicts to ensure they pass
 
 ## Development Setup
 
@@ -35,11 +56,9 @@ claude auth login
 
 ```
 claude_code_designer/
-├── __init__.py          # Package initialization
-├── models.py            # Pydantic data models
-├── questionnaire.py     # Interactive question system
-├── generator.py         # Document generation engine
-└── cli.py              # Click-based CLI interface
+├── __init__.py                  # Package initialization
+├── cli.py                      # Interactive design assistant CLI
+└── save_claude_conversation.py  # Conversation history management
 ```
 
 ## Common Commands
@@ -64,12 +83,13 @@ uv pip install -e .
 
 ### Testing the CLI
 ```bash
-# Test basic functionality
-python hello.py
-
-# Test CLI commands
+# Test design assistant CLI commands
 uv run python -m claude_code_designer.cli --help
-uv run python -m claude_code_designer.cli design --help
+uv run python -m claude_code_designer.cli app --help
+uv run python -m claude_code_designer.cli feature --help
+
+# Test programmatic usage
+uv run python -c "from claude_code_designer import DesignAssistant; print('✅ Import successful')"
 ```
 
 ## Architecture Principles
@@ -83,6 +103,14 @@ uv run python -m claude_code_designer.cli design --help
 - Straightforward question flow with minimal dynamic complexity
 - Essential async patterns only - no premature optimization
 - Simple error handling without extensive recovery mechanisms
+
+### Design Assistant Architecture
+- **App-Designer Subagent**: Uses specialized app-designer subagent for application and feature design
+- **Conversation-Evaluator Subagent**: Uses specialized conversation-evaluator subagent for quality assessment
+- **Interactive Sessions**: AI-powered conversations with expert domain knowledge
+- **Conversation Storage**: JSON-based storage with timestamps and metadata
+- **Programmatic Access**: DesignAssistant class for integration with other tools
+- **Simple State Management**: Stateless conversations with preserved history
 
 ## Code Quality Standards
 
@@ -113,9 +141,55 @@ except Exception as e:
 
 ## Common Workflows
 
+### Using the Design Assistant
+
+#### Interactive Application Design
+```bash
+# Start interactive application design
+uv run python -m claude_code_designer.cli app
+
+# Non-interactive with parameters
+uv run python -m claude_code_designer.cli app --name "MyApp" --type web --non-interactive
+```
+
+#### Interactive Feature Design
+```bash
+# Start interactive feature design
+uv run python -m claude_code_designer.cli feature
+
+# Non-interactive with description
+uv run python -m claude_code_designer.cli feature --description "OAuth login" --non-interactive
+```
+
+#### Programmatic Usage
+```python
+from claude_code_designer import DesignAssistant
+import asyncio
+
+async def design_app():
+    assistant = DesignAssistant("./conversations")
+    conversation = await assistant.design_application(
+        project_name="MyApp",
+        project_type="web",
+        interactive=False
+    )
+    return conversation
+
+asyncio.run(design_app())
+```
+
+#### Managing Conversations
+```bash
+# List saved conversations
+uv run python -m claude_code_designer.cli list-conversations
+
+# Conversations are saved as JSON files with timestamps
+ls ./conversations/
+```
+
 ### Adding Features (Consider if Really Needed)
-1. **Question Types**: Only add if absolutely essential - prefer simplifying existing questions
-2. **Document Types**: Avoid adding new types - focus on improving the three core documents
+1. **Design Modes**: Only add new design modes if absolutely essential - prefer improving existing app/feature modes
+2. **Conversation Features**: Avoid adding complex conversation management - focus on simple save/list functionality
 3. **General Rule**: Every new feature increases maintenance overhead - default to "no" unless critical
 
 ### Debugging Claude Code SDK Issues

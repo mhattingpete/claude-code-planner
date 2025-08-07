@@ -1,13 +1,13 @@
 # Claude Code Designer
 
-Simple, minimal-maintenance CLI for generating essential project documentation using Claude Code SDK
+Interactive AI-powered design assistant using Claude Code SDK for application and feature design guidance
 
 ## Features
 
-- **Simple Questionnaire**: Essential questions to capture core project details
-- **Minimal Document Generation**: Creates only the documentation you need: PRD, CLAUDE.md, and README
-- **Clean Terminal Interface**: Straightforward CLI without unnecessary complexity
-- **Basic Output Options**: Simple controls for document generation and location
+- **Interactive Design Assistant**: AI-powered application and feature design guidance using app-designer subagent
+- **Clean Terminal Interface**: Straightforward CLI without unnecessary complexity  
+- **Conversation History**: Automatically saves design sessions for future reference
+- **Programmatic API**: Use design assistant functionality from other Python scripts
 
 ## Installation
 
@@ -33,90 +33,68 @@ uv sync --dev
 
 ## Usage
 
-### Basic Usage
+### Design Assistant (New!)
 
-Start the interactive design process:
+Get AI-powered help designing applications and features:
 
 ```bash
-claude-designer design
+# Design a new application interactively
+uv run python -m claude_code_designer.cli app
+
+# Design a new feature
+uv run python -m claude_code_designer.cli feature
+
+# Non-interactive mode with parameters
+uv run python -m claude_code_designer.cli app --name "MyApp" --type web --non-interactive
+
+# List saved conversation history
+uv run python -m claude_code_designer.cli list-conversations
 ```
 
-### Advanced Options
 
-```bash
-# Specify output directory
-claude-designer design --output-dir ./my-project
+### Programmatic Usage
 
-# Skip specific documents
-claude-designer design --skip-prd --skip-claude-md
+Use the design assistant from other Python scripts:
 
-# Get help
-claude-designer --help
-claude-designer info
+```python
+from claude_code_designer import DesignAssistant
+import asyncio
+
+async def design_my_app():
+    assistant = DesignAssistant("./conversations")
+    
+    # Design a new application
+    conversation = await assistant.design_application(
+        project_name="TaskTracker Pro",
+        project_type="web",
+        interactive=False,
+        max_turns=10
+    )
+    
+    print(f"Design completed with {conversation['output']['message_count']} messages")
+
+asyncio.run(design_my_app())
 ```
 
 ### What It Looks Like
 
 ```bash
-$ claude-designer design
+$ uv run python -m claude_code_designer.cli app
 
-  Getting Started  
- Welcome to Claude 
- Code Designer     
-                   
- Let's design your 
- application...    
-                   
+🚀 Application Design Assistant
 
-  Question app_type  
- What type of        
- application?        
-                     
+What's the name of your project? TaskTracker Pro
+What type of application are you building? [web/cli/api/mobile/desktop/library/other] (web): web
 
-  1. Web Application
-  2. CLI Tool
-  3. API Service
-  4. Mobile App
+Starting app-designer design session...
+Starting conversation with prompt: I need comprehensive application design assistance...
+Received message: TextMessage
+Received message: ToolUseMessage
+...
 
-Select option [1]: 2
-
-# ... more questions ...
-
-  Design Summary  
- Application: my-cli-tool 
- Type: cli tool          
- Tech Stack: Python      
- Features: CLI, Config   
-                         
-
-Generate project documents? [y/N]: y
-
-✅ Successfully generated 3 documents!
-   Output directory: /current/directory
+✅ Design session completed with 8 messages
+Conversation saved to: ./conversations/20250106_123456_I_need_comprehensive_application.json
 ```
-
-## Generated Documents
-
-### PRD.md
-Essential Product Requirements Document with:
-- Concise summary and core goals
-- Basic requirements without over-specification
-- Simple success metrics
-- Minimal timeline estimates
-
-### CLAUDE.md
-Simple technical guidelines:
-- Basic development rules focused on maintainability
-- Essential commands and workflows
-- Simple architecture principles (KISS > SOLID > DRY)
-- Minimal maintenance procedures
-
-### README.md
-Clear project documentation:
-- Simple installation steps
-- Basic usage examples
-- Essential information only
-- No unnecessary complexity
 
 ## Configuration
 
@@ -163,10 +141,8 @@ uv pip install -e .
 
 ## How It's Built
 
-- **`models.py`**: Defines what data we collect and how we validate it
-- **`questionnaire.py`**: Handles the conversation with users and collects their answers
-- **`generator.py`**: Takes those answers and creates beautiful documents
-- **`cli.py`**: The command-line interface that ties everything together
+- **`cli.py`**: Interactive design assistant and command-line interface
+- **`save_claude_conversation.py`**: Saves conversation history for future reference
 
 ## Want to Help?
 
@@ -206,7 +182,8 @@ MIT License - see LICENSE file for details.
 ## Version History
 
 ### v0.1.0 (First Release)
-- Interactive questionnaire that asks the right questions
-- Generates three essential documents every project needs
+- Interactive design assistant for applications and features
+- Conversation history saving and management
+- Programmatic API for integration with other tools
 - Clean, simple interface that doesn't get in your way
 - Reliable integration with Claude AI
