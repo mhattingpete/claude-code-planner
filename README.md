@@ -20,7 +20,7 @@ Interactive AI-powered design assistant using Claude Code SDK for application an
 - Node.js (for Claude Code CLI)
 - Claude Code CLI: `npm install -g @anthropic-ai/claude-code`
 
-### Install from PyPI (Coming Soon)
+### Install from PyPI
 
 ```bash
 pip install claude-code-designer
