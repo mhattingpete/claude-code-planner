@@ -5,6 +5,9 @@ Interactive AI-powered design assistant using Claude Code SDK for application an
 ## Features
 
 - **Interactive Design Assistant**: AI-powered application and feature design guidance using app-designer subagent
+- **Conversation Evaluation**: Analyze design conversation quality using conversation-evaluator subagent
+- **Automated Simulation**: Run automated design sessions with synthetic scenarios for testing
+- **Continuous Learning**: Learn from evaluation results to improve future interactions
 - **Clean Terminal Interface**: Straightforward CLI without unnecessary complexity  
 - **Conversation History**: Automatically saves design sessions for future reference
 - **Programmatic API**: Use design assistant functionality from other Python scripts
@@ -33,7 +36,7 @@ uv sync --dev
 
 ## Usage
 
-### Design Assistant (New!)
+### Design Assistant
 
 Get AI-powered help designing applications and features:
 
@@ -51,30 +54,71 @@ uv run python -m claude_code_designer.cli app --name "MyApp" --type web --non-in
 uv run python -m claude_code_designer.cli list-conversations
 ```
 
+### Conversation Evaluation
+
+Analyze and evaluate design conversation quality:
+
+```bash
+# Evaluate all conversations
+uv run python -m claude_code_designer.cli evaluate
+
+# Evaluate a specific conversation
+uv run python -m claude_code_designer.cli evaluate --conversation-file conversation_20250106.json
+
+# Custom directories
+uv run python -m claude_code_designer.cli evaluate --conversation-dir ./my-conversations --evaluation-dir ./my-evaluations
+```
+
+### Simulation and Learning
+
+Run automated design simulations with continuous learning:
+
+```bash
+# Run simulation cycles with learning enabled
+uv run python -m claude_code_designer.cli simulate --cycles 5 --enable-learning
+
+# Generate app-only or feature-only scenarios
+uv run python -m claude_code_designer.cli simulate --type app --cycles 3
+
+# Custom simulation settings
+uv run python -m claude_code_designer.cli simulate --delay 3.0 --conversation-dir ./sim-conversations
+
+# Manually trigger learning from evaluations
+uv run python -m claude_code_designer.cli learn --evaluation-dir ./simulation_evaluations
+
+# View learning system statistics
+uv run python -m claude_code_designer.cli knowledge-stats
+```
+
 
 ### Programmatic Usage
 
-Use the design assistant from other Python scripts:
+Use the design assistant and other components from Python scripts:
 
 ```python
-from claude_code_designer import DesignAssistant
+from claude_code_designer import DesignAssistant, ConversationEvaluator
 import asyncio
 
 async def design_my_app():
-    assistant = DesignAssistant("./conversations")
-    
     # Design a new application
+    assistant = DesignAssistant("./conversations")
     conversation = await assistant.design_application(
         project_name="TaskTracker Pro",
         project_type="web",
         interactive=False,
         max_turns=10
     )
-    
     print(f"Design completed with {conversation['output']['message_count']} messages")
+    
+    # Evaluate the conversation quality
+    evaluator = ConversationEvaluator("./conversations", "./evaluations")
+    evaluation = await evaluator.evaluate_conversation(conversation['file_path'])
+    print(f"Quality score: {evaluation['scores']['overall']}/10")
 
 asyncio.run(design_my_app())
 ```
+
+See the `examples/` directory for more usage examples including simulation and learning system integration.
 
 ### What It Looks Like
 
@@ -141,7 +185,11 @@ uv pip install -e .
 
 ## How It's Built
 
-- **`cli.py`**: Interactive design assistant and command-line interface
+- **`cli.py`**: Command-line interface with all CLI commands
+- **`design_assistant.py`**: Core design assistant using app-designer subagent
+- **`conversation_evaluator.py`**: Evaluates conversation quality using conversation-evaluator subagent
+- **`simulator.py`**: Automated simulation system for testing design scenarios
+- **`learning_system.py`**: Continuous learning from evaluation results
 - **`save_claude_conversation.py`**: Saves conversation history for future reference
 
 ## Want to Help?

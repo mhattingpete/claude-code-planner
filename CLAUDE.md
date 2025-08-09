@@ -57,8 +57,18 @@ claude auth login
 ```
 claude_code_designer/
 ├── __init__.py                  # Package initialization
-├── cli.py                      # Interactive design assistant CLI
+├── cli.py                       # Command-line interface with all commands
+├── design_assistant.py          # Core design assistant functionality
+├── conversation_evaluator.py    # Conversation quality evaluation
+├── simulator.py                 # Automated simulation system
+├── learning_system.py           # Continuous learning from evaluations
 └── save_claude_conversation.py  # Conversation history management
+
+examples/
+├── programmatic_usage.py        # Example of using DesignAssistant programmatically
+├── evaluation_example.py        # Example of evaluating conversations
+├── simulator_example.py         # Example of running simulations
+└── learning_system_example.py   # Example of learning system usage
 ```
 
 ## Common Commands
@@ -111,6 +121,8 @@ uv run python -c "from claude_code_designer import DesignAssistant; print('✅ I
 - **Conversation Storage**: JSON-based storage with timestamps and metadata
 - **Programmatic Access**: DesignAssistant class for integration with other tools
 - **Simple State Management**: Stateless conversations with preserved history
+- **Automated Simulation**: DesignSimulator class for running synthetic test scenarios
+- **Continuous Learning**: LearningSystem class for improving from evaluation results
 
 ## Code Quality Standards
 
@@ -161,21 +173,55 @@ uv run python -m claude_code_designer.cli feature
 uv run python -m claude_code_designer.cli feature --description "OAuth login" --non-interactive
 ```
 
+#### Evaluating Conversations
+```bash
+# Evaluate all conversations
+uv run python -m claude_code_designer.cli evaluate
+
+# Evaluate specific conversation
+uv run python -m claude_code_designer.cli evaluate --conversation-file conversation_20250106.json
+```
+
+#### Running Simulations
+```bash
+# Run simulation with learning
+uv run python -m claude_code_designer.cli simulate --cycles 5 --enable-learning
+
+# Run app-only simulation
+uv run python -m claude_code_designer.cli simulate --type app --cycles 3
+```
+
+#### Learning System
+```bash
+# Manually trigger learning
+uv run python -m claude_code_designer.cli learn
+
+# View knowledge statistics
+uv run python -m claude_code_designer.cli knowledge-stats
+```
+
 #### Programmatic Usage
 ```python
-from claude_code_designer import DesignAssistant
+from claude_code_designer import DesignAssistant, ConversationEvaluator
 import asyncio
 
-async def design_app():
+async def design_and_evaluate():
+    # Design application
     assistant = DesignAssistant("./conversations")
     conversation = await assistant.design_application(
         project_name="MyApp",
         project_type="web",
         interactive=False
     )
-    return conversation
+    
+    # Evaluate quality
+    evaluator = ConversationEvaluator("./conversations", "./evaluations")
+    evaluation = await evaluator.evaluate_conversation(conversation['file_path'])
+    
+    print(f"Quality score: {evaluation['scores']['overall']}/10")
+    return conversation, evaluation
 
-asyncio.run(design_app())
+asyncio.run(design_and_evaluate())
 ```
 
 #### Managing Conversations
