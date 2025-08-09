@@ -57,6 +57,7 @@ coverage:
 .PHONY: publish
 publish:
 	@echo "Publishing package to PyPI"
+	rm -rf dist
 	uv build
 	uv publish
 
