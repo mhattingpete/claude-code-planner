@@ -12,6 +12,12 @@ help:
 	@echo "  format           Run code formatter"
 	@echo "  tests            Run tests (alias)"
 	@echo "  coverage         Generate coverage report"
+	@echo ""
+	@echo "Design Assistant:"
+	@echo "  design-app       Design a new application interactively"
+	@echo "  design-feature   Design a new feature interactively"
+	@echo "  simulate         Run automated simulation with learning"
+	@echo "  knowledge-stats  View learning system statistics"
 
 .PHONY: install
 install:
@@ -53,3 +59,23 @@ publish:
 	@echo "Publishing package to PyPI"
 	uv build
 	uv publish
+
+.PHONY: design-app
+design-app:
+	@echo "Starting interactive application design assistant..."
+	uv run python -m claude_code_designer.cli app
+
+.PHONY: design-feature
+design-feature:
+	@echo "Starting interactive feature design assistant..."
+	uv run python -m claude_code_designer.cli feature
+
+.PHONY: simulate
+simulate:
+	@echo "Running automated design simulation with learning..."
+	uv run python -m claude_code_designer.cli simulate --cycles 5 --enable-learning
+
+.PHONY: knowledge-stats
+knowledge-stats:
+	@echo "Displaying learning system knowledge statistics..."
+	uv run python -m claude_code_designer.cli knowledge-stats

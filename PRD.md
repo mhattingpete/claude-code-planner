@@ -25,10 +25,12 @@ Claude Code Designer is a simple, minimal-maintenance CLI tool that leverages th
 - **Provide Interactive Design Assistance**: Offer AI-powered guidance for application and feature design
 - **Simplify Architecture Decision Making**: Help developers make informed technical choices
 - **Preserve Design Knowledge**: Maintain conversation history and design decisions for future reference
+- **Continuous Quality Improvement**: Learn from conversations to enhance future interactions
 
 ### Secondary Goals
 - **Minimal Maintenance Overhead**: Ensure tool requires little to no ongoing updates
 - **Focused AI Assistance**: Use Claude to provide essential guidance, avoiding feature bloat
+- **Automated Testing**: Enable simulation-based testing for quality assurance
 - **Conversation Management**: Maintain history of design sessions for future reference
 - **Programmatic Access**: Enable integration with other development tools and workflows
 
@@ -86,7 +88,7 @@ So that I can integrate design guidance into my development tools.
 
 ### FR-1: CLI Interface
 - Simple, clean terminal interface with minimal visual complexity
-- Command structure: `uv run python -m claude_code_designer.cli [app|feature|list-conversations]`
+- Command structure: `uv run python -m claude_code_designer.cli [app|feature|evaluate|simulate|learn|knowledge-stats|list-conversations]`
 - Basic options to customize behavior without feature bloat
 - Essential error handling without over-engineering
 
@@ -103,8 +105,26 @@ So that I can integrate design guidance into my development tools.
 - **JSON Format**: Store conversations in structured JSON format for easy processing
 - **Conversation Directory**: Configurable directory for storing conversation history
 
-### FR-4: Programmatic API
-- **DesignAssistant Class**: Main class for programmatic access to design functionality
+### FR-4: Conversation Evaluation
+- **Conversation-Evaluator Subagent**: Specialized AI agent for analyzing conversation quality
+- **Quality Metrics**: Evaluate user satisfaction, task completion, clarity, and agent performance
+- **Batch Evaluation**: Process multiple conversations in a single operation
+- **Evaluation Reports**: Generate detailed JSON reports with scores and improvement suggestions
+
+### FR-5: Automated Simulation
+- **Synthetic Scenario Generation**: Create realistic app and feature design scenarios
+- **Automated Testing**: Run design sessions without human intervention
+- **Performance Metrics**: Track success rates, quality scores, and timing data
+- **Configurable Cycles**: Run multiple simulation rounds with delays
+
+### FR-6: Learning System
+- **Pattern Recognition**: Identify successful design patterns from evaluations
+- **Knowledge Base**: Build and maintain rules for improving interactions
+- **Confidence Scoring**: Track reliability of learned patterns
+- **Continuous Improvement**: Apply learned rules to enhance future conversations
+
+### FR-7: Programmatic API
+- **Core Classes**: DesignAssistant, ConversationEvaluator, DesignSimulator, LearningSystem
 - **Async Interface**: Full async/await support for integration with existing async applications
 - **Configuration Options**: Customizable system prompts, conversation turns, and tool permissions
 - **Return Structured Data**: Return conversation data in structured format for processing

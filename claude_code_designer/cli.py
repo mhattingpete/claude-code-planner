@@ -21,8 +21,6 @@ from .simulator import DesignSimulator
 console = Console()
 
 
-
-
 @click.group()
 @click.option(
     "--conversation-dir",
@@ -182,52 +180,55 @@ def evaluate(conversation_dir, evaluation_dir, conversation_file):
     "--type",
     "scenario_type",
     type=click.Choice(["app", "feature"]),
-    help="Type of scenarios to generate (app, feature, or mixed)"
+    help="Type of scenarios to generate (app, feature, or mixed)",
 )
 @click.option(
-    "--conversation-dir", 
+    "--conversation-dir",
     default="./simulation_conversations",
-    help="Directory for simulation conversations"
+    help="Directory for simulation conversations",
 )
 @click.option(
     "--evaluation-dir",
-    default="./simulation_evaluations", 
-    help="Directory for simulation evaluations"
+    default="./simulation_evaluations",
+    help="Directory for simulation evaluations",
 )
 @click.option(
     "--results-dir",
     default="./simulation_results",
-    help="Directory for simulation results"
+    help="Directory for simulation results",
 )
 @click.option(
     "--learning-dir",
     default="./learning_knowledge",
-    help="Directory for learning knowledge base"
+    help="Directory for learning knowledge base",
 )
 @click.option(
     "--enable-learning/--disable-learning",
     default=True,
-    help="Enable/disable learning from evaluations"
+    help="Enable/disable learning from evaluations",
 )
-def simulate(cycles, delay, scenario_type, conversation_dir, evaluation_dir, results_dir, learning_dir, enable_learning):
+def simulate(
+    cycles,
+    delay,
+    scenario_type,
+    conversation_dir,
+    evaluation_dir,
+    results_dir,
+    learning_dir,
+    enable_learning,
+):
     """Run automated design simulation and evaluation cycles."""
     console.print(Panel.fit("🔬 Design Assistant Simulator", style="bold cyan"))
-    
+
     simulator = DesignSimulator(
-        conversation_dir, 
-        evaluation_dir, 
-        results_dir, 
-        learning_dir, 
-        enable_learning
+        conversation_dir, evaluation_dir, results_dir, learning_dir, enable_learning
     )
-    
+
     async def run_simulation():
         return await simulator.run_simulation_loop(
-            max_cycles=cycles,
-            delay_seconds=delay,
-            scenario_type=scenario_type
+            max_cycles=cycles, delay_seconds=delay, scenario_type=scenario_type
         )
-    
+
     try:
         results = asyncio.run(run_simulation())
         console.print(f"✅ Simulation completed with {len(results)} cycles")
@@ -242,33 +243,35 @@ def simulate(cycles, delay, scenario_type, conversation_dir, evaluation_dir, res
 @click.option(
     "--knowledge-dir",
     default="./learning_knowledge",
-    help="Directory containing learning knowledge base"
+    help="Directory containing learning knowledge base",
 )
 @click.option(
     "--evaluation-dir",
     default="./simulation_evaluations",
-    help="Directory containing evaluation files to learn from"
+    help="Directory containing evaluation files to learn from",
 )
 def learn(knowledge_dir, evaluation_dir):
     """Manually trigger learning from existing evaluation files."""
     console.print(Panel.fit("🧠 Learning System", style="bold magenta"))
-    
+
     learning_system = LearningSystem(knowledge_dir, evaluation_dir)
-    
+
     async def run_learning():
         await learning_system.learn_from_evaluations()
         stats = learning_system.get_knowledge_stats()
-        
+
         console.print("📊 Learning completed!")
         console.print(f"   Total rules: {stats.get('total_rules', 0)}")
-        console.print(f"   High confidence rules: {stats.get('confidence_distribution', {}).get('high', 0)}")
+        console.print(
+            f"   High confidence rules: {stats.get('confidence_distribution', {}).get('high', 0)}"
+        )
         console.print(f"   Average confidence: {stats.get('avg_confidence', 0):.2f}")
-        
-        if stats.get('rule_types'):
+
+        if stats.get("rule_types"):
             console.print("   Rule types:")
-            for rule_type, count in stats['rule_types'].items():
+            for rule_type, count in stats["rule_types"].items():
                 console.print(f"     - {rule_type}: {count}")
-    
+
     try:
         asyncio.run(run_learning())
     except KeyboardInterrupt:
@@ -281,31 +284,31 @@ def learn(knowledge_dir, evaluation_dir):
 @click.option(
     "--knowledge-dir",
     default="./learning_knowledge",
-    help="Directory containing learning knowledge base"
+    help="Directory containing learning knowledge base",
 )
 def knowledge_stats(knowledge_dir):
     """Show learning system knowledge base statistics."""
     console.print(Panel.fit("📚 Knowledge Base Statistics", style="bold blue"))
-    
+
     learning_system = LearningSystem(knowledge_dir)
     stats = learning_system.get_knowledge_stats()
-    
-    if stats.get('total_rules', 0) == 0:
+
+    if stats.get("total_rules", 0) == 0:
         console.print("❌ No learning rules found. Run some simulations first!")
         return
-    
+
     console.print(f"📊 Total learning rules: {stats['total_rules']}")
     console.print(f"📈 Average confidence: {stats.get('avg_confidence', 0):.2f}")
-    
+
     console.print("\n🎯 Confidence distribution:")
-    confidence = stats.get('confidence_distribution', {})
+    confidence = stats.get("confidence_distribution", {})
     console.print(f"   • High (≥0.8): {confidence.get('high', 0)}")
     console.print(f"   • Medium (0.6-0.8): {confidence.get('medium', 0)}")
     console.print(f"   • Low (<0.6): {confidence.get('low', 0)}")
-    
-    if stats.get('rule_types'):
+
+    if stats.get("rule_types"):
         console.print("\n📋 Rule types:")
-        for rule_type, count in stats['rule_types'].items():
+        for rule_type, count in stats["rule_types"].items():
             console.print(f"   • {rule_type}: {count}")
 
 
