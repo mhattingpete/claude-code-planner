@@ -3,6 +3,7 @@ name = "claude-code-designer"
 version = "0.3.1"
 description = "Interactive CLI for designing applications using Claude Code SDK"
 readme = "README.md"
+keywords = ["claude", "ai", "design", "sdk", "cli"]
 requires-python = ">=3.11"
 dependencies = [
     "claude-code-sdk>=0.0.17",
